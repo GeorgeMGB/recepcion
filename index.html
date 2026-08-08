@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#111317">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Inventario">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<title>Captura de Inventario</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<style>
+  :root{
+    --bg:#111317;
+    --panel:#1B1E24;
+    --panel-2:#22262D;
+    --border:#33383F;
+    --text:#ECE9E3;
+    --text-dim:#93989F;
+    --accent:#FF4438;
+    --accent-soft:rgba(255,68,56,0.14);
+    --success:#3ADC84;
+    --success-soft:rgba(58,220,132,0.12);
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+    padding-bottom:64px;
+  }
+  .barcode-rule{
+    height:14px;
+    background-image:repeating-linear-gradient(90deg,var(--border) 0 2px,transparent 2px 5px, var(--border) 5px 6px, transparent 6px 11px, var(--border) 11px 13px, transparent 13px 18px);
+    opacity:.55;
+    margin:0;
+  }
+  header{
+    padding:22px 20px 16px;
+    border-bottom:1px solid var(--border);
+    position:sticky;top:0;
+    background:rgba(17,19,23,0.92);
+    backdrop-filter:blur(8px);
+    z-index:20;
+  }
+  .install-banner{
+    display:none;
+    align-items:center;
+    gap:10px;
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:10px 12px;
+    margin:0 16px 14px;
+    font-size:12.5px;
+    color:var(--text-dim);
+    line-height:1.45;
+  }
+  .install-banner.show{display:flex;}
+  .install-banner .share-icon{
+    flex:none;
+    width:22px;height:22px;
+    color:var(--accent);
+  }
+  .install-banner b{color:var(--text);}
+  .install-banner .close-x{
+    flex:none;
+    background:none;border:none;
+    color:var(--text-dim);
+    font-size:16px;
+    padding:0 2px;
+    cursor:pointer;
+  }
+  .eyebrow{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    color:var(--accent);
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .eyebrow::before{
+    content:"";
+    width:6px;height:6px;border-radius:50%;
+    background:var(--accent);
+    box-shadow:0 0 0 3px var(--accent-soft);
+  }
+  h1{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:24px;
+    margin:6px 0 2px;
+    font-weight:700;
+    letter-spacing:-0.01em;
+  }
+  .sub{color:var(--text-dim);font-size:13px;}
+  main{padding:18px 16px 0;max-width:640px;margin:0 auto;}
+  section{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:16px;
+    margin-bottom:16px;
+  }
+  section h2{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:14px;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    color:var(--text-dim);
+    margin:0 0 12px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+  }
+  .tag{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    padding:3px 8px;
+    border-radius:20px;
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    color:var(--text-dim);
+  }
+  .tag.on{background:var(--success-soft);border-color:var(--success);color:var(--success);}
+  label{
+    display:block;
+    font-size:12px;
+    color:var(--text-dim);
+    margin-bottom:6px;
+    font-weight:500;
+  }
+  input[type=text], input[type=number]{
+    width:100%;
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:12px 12px;
+    color:var(--text);
+    font-family:'JetBrains Mono',monospace;
+    font-size:15px;
+    margin-bottom:12px;
+  }
+  input:focus{outline:none;border-color:var(--accent);}
+  input[type=file]{
+    width:100%;
+    font-size:13px;
+    color:var(--text-dim);
+    margin-bottom:4px;
+  }
+  .field-desc{font-family:'Inter',sans-serif;font-size:14px;}
+  .row2{display:flex;gap:10px;}
+  .row2 > div{flex:1;}
+  button{
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:600;
+    font-size:14px;
+    border-radius:8px;
+    border:1px solid transparent;
+    padding:13px 16px;
+    cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .btn-primary{
+    background:var(--accent);
+    color:#fff;
+    width:100%;
+  }
+  .btn-primary:disabled{opacity:.4;}
+  .btn-ghost{
+    background:var(--panel-2);
+    color:var(--text);
+    border:1px solid var(--border);
+    width:100%;
+  }
+  .btn-success{
+    background:var(--success);
+    color:#0B1310;
+  }
+  .btn-danger-outline{
+    background:transparent;
+    border:1px solid #4a2a28;
+    color:#ff8b83;
+    padding:6px 10px;
+    font-size:12px;
+  }
+  #reader-wrap{
+    position:relative;
+    border-radius:8px;
+    overflow:hidden;
+    border:1px solid var(--border);
+    background:#000;
+    display:none;
+    margin-bottom:12px;
+  }
+  #reader-wrap.active{display:block;}
+  #reader{width:100%;}
+  .scan-line{
+    position:absolute;
+    left:6%;right:6%;
+    top:50%;
+    height:2px;
+    background:var(--accent);
+    box-shadow:0 0 8px 1px var(--accent);
+    animation:scanmove 1.6s ease-in-out infinite;
+    pointer-events:none;
+  }
+  @keyframes scanmove{
+    0%,100%{top:22%;}
+    50%{top:78%;}
+  }
+  .scan-frame{
+    position:absolute;
+    left:6%;right:6%;top:14%;bottom:14%;
+    border:2px solid rgba(255,68,56,.55);
+    border-radius:6px;
+    pointer-events:none;
+  }
+  .status-line{
+    font-family:'JetBrains Mono',monospace;
+    font-size:12px;
+    color:var(--text-dim);
+    margin-top:8px;
+    min-height:16px;
+    line-height:1.5;
+  }
+  .status-line.ok{color:var(--success);}
+  .status-line.err{color:var(--accent);}
+  .permission-banner{
+    display:none;
+    background:var(--accent-soft);
+    border:1px solid var(--accent);
+    border-radius:8px;
+    padding:12px;
+    font-size:13px;
+    color:var(--text);
+    margin-bottom:12px;
+    line-height:1.5;
+  }
+  .permission-banner.show{display:block;}
+  .permission-banner b{color:var(--accent);}
+  .permission-banner ol{margin:6px 0 0;padding-left:18px;}
+  .scan-controls{display:flex;gap:8px;}
+  .scan-controls .btn-primary{flex:1;}
+  .btn-icon{
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    color:var(--text);
+    width:48px;
+    flex:none;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    font-size:18px;
+  }
+  .btn-icon.show{display:flex;}
+  .btn-icon.active{background:var(--accent);border-color:var(--accent);}
+  select#camera-select{
+    display:none;
+    width:100%;
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:10px 12px;
+    color:var(--text);
+    font-family:'JetBrains Mono',monospace;
+    font-size:13px;
+    margin-bottom:10px;
+  }
+  select#camera-select.show{display:block;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{
+    text-align:left;
+    font-family:'JetBrains Mono',monospace;
+    font-size:10px;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    color:var(--text-dim);
+    padding:0 6px 8px;
+    border-bottom:1px solid var(--border);
+  }
+  td{
+    padding:10px 6px;
+    border-bottom:1px solid var(--border);
+    vertical-align:middle;
+  }
+  td.code{font-family:'JetBrains Mono',monospace;color:var(--accent);}
+  td.qty{font-family:'JetBrains Mono',monospace;text-align:right;width:56px;}
+  td.qty input{
+    width:56px;padding:6px;margin:0;font-size:13px;text-align:right;
+  }
+  .empty-state{
+    text-align:center;
+    padding:28px 10px;
+    color:var(--text-dim);
+    font-size:13px;
+  }
+  .totals{
+    display:flex;
+    justify-content:space-between;
+    font-family:'JetBrains Mono',monospace;
+    font-size:12px;
+    color:var(--text-dim);
+    padding-top:10px;
+    margin-top:4px;
+    border-top:1px dashed var(--border);
+  }
+  .totals b{color:var(--text);}
+  footer.actions{
+    max-width:640px;margin:0 auto;
+    padding:0 16px;
+    display:flex;gap:10px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">Lector activo</div>
+  <h1>Captura de Inventario</h1>
+  <div class="sub">Escanea, teclea cantidad, exporta a Excel.</div>
+</header>
+<div class="install-banner" id="ios-install-banner">
+  <svg class="share-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M12 4l-4 4M12 4l4 4"/><path d="M4 14v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/></svg>
+  <div><b>Ábrela sin la barra de Safari:</b> toca Compartir → "Añadir a pantalla de inicio". Se abrirá como app completa.</div>
+  <button class="close-x" id="ios-install-close" aria-label="Cerrar">✕</button>
+</div>
+<div class="install-banner" id="android-install-banner">
+  <svg class="share-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>
+  <div style="flex:1;"><b>Instala la app:</b> ábrela directo desde tu pantalla de inicio, sin el navegador.</div>
+  <button class="btn-primary" id="android-install-btn" style="width:auto;padding:8px 12px;font-size:12.5px;flex:none;">Instalar</button>
+  <button class="close-x" id="android-install-close" aria-label="Cerrar">✕</button>
+</div>
+<div class="barcode-rule"></div>
+
+<main>
+
+  <section id="db-section">
+    <h2>Base de datos <span class="tag" id="db-tag">No cargada</span></h2>
+    <label for="db-file">Archivo opcional (.xlsx / .csv) con columnas de código y descripción</label>
+    <input type="file" id="db-file" accept=".xlsx,.xls,.csv">
+    <div class="status-line" id="db-status">Sin base de datos: la descripción se capturará manualmente.</div>
+  </section>
+
+  <section>
+    <h2>Escanear artículo <span class="tag" id="cam-tag">Cámara no iniciada</span></h2>
+
+    <div class="permission-banner" id="permission-banner">
+      <b>Acceso a la cámara bloqueado.</b>
+      <div id="permission-msg">Actívalo para poder escanear:</div>
+      <ol id="permission-steps">
+        <li>Abre <b>Ajustes</b> del iPhone</li>
+        <li>Baja hasta <b>Safari</b> → <b>Cámara</b></li>
+        <li>Selecciona <b>Permitir</b></li>
+        <li>Vuelve aquí y toca "Reintentar"</li>
+      </ol>
+    </div>
+
+    <select id="camera-select"></select>
+
+    <div id="reader-wrap">
+      <div id="reader"></div>
+      <div class="scan-frame"></div>
+      <div class="scan-line"></div>
+    </div>
+
+    <div class="scan-controls">
+      <button class="btn-primary" id="scan-btn" type="button">Iniciar escáner</button>
+      <button class="btn-icon" id="torch-btn" type="button" title="Linterna">💡</button>
+    </div>
+    <div class="status-line" id="scan-status">Toca "Iniciar escáner" y autoriza el uso de la cámara cuando Safari lo pida.</div>
+  </section>
+
+  <section>
+    <h2>Artículo</h2>
+    <label for="code-input">Código</label>
+    <input type="text" id="code-input" placeholder="Escanea o teclea el código" autocomplete="off">
+    <label for="desc-input">Descripción</label>
+    <input type="text" id="desc-input" class="field-desc" placeholder="Descripción del artículo" autocomplete="off">
+    <div class="row2">
+      <div>
+        <label for="qty-input">Cantidad</label>
+        <input type="number" id="qty-input" inputmode="decimal" placeholder="0" min="0">
+      </div>
+    </div>
+    <button class="btn-success" id="add-btn" type="button" style="width:100%;">Agregar a la lista</button>
+  </section>
+
+  <section>
+    <h2>Lista capturada <span class="tag" id="count-tag">0 artículos</span></h2>
+    <div id="table-wrap">
+      <div class="empty-state" id="empty-msg">Aún no hay artículos capturados.</div>
+      <table id="items-table" style="display:none;">
+        <thead>
+          <tr><th>Código</th><th>Descripción</th><th style="text-align:right;">Cant.</th><th></th></tr>
+        </thead>
+        <tbody id="items-body"></tbody>
+      </table>
+    </div>
+    <div class="totals">
+      <span>Renglones: <b id="total-rows">0</b></span>
+      <span>Cantidad total: <b id="total-qty">0</b></span>
+    </div>
+  </section>
+
+</main>
+
+<footer class="actions">
+  <button class="btn-ghost" id="reset-btn" type="button">Reiniciar lista</button>
+  <button class="btn-primary" id="export-btn" type="button">Exportar a Excel</button>
+</footer>
+
+<script>
+// ---------- Add-to-Home-Screen: iOS ----------
+(function initIosBanner() {
+  const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isStandalone = ('standalone' in navigator) && navigator.standalone;
+  const banner = document.getElementById('ios-install-banner');
+  if (isIos && !isStandalone && !storageSafeGet('iosBannerDismissed')) {
+    banner.classList.add('show');
+  }
+  document.getElementById('ios-install-close').addEventListener('click', () => {
+    banner.classList.remove('show');
+    storageSafeSet('iosBannerDismissed', '1');
+  });
+})();
+
+// ---------- Add-to-Home-Screen: Android (native install prompt) ----------
+let deferredInstallPrompt = null;
+const androidBanner = document.getElementById('android-install-banner');
+
+window.addEventListener('beforeinstallprompt', (event) => {
+  event.preventDefault();
+  deferredInstallPrompt = event;
+  if (!storageSafeGet('androidBannerDismissed')) {
+    androidBanner.classList.add('show');
+  }
+});
+
+document.getElementById('android-install-btn').addEventListener('click', async () => {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+  androidBanner.classList.remove('show');
+});
+
+document.getElementById('android-install-close').addEventListener('click', () => {
+  androidBanner.classList.remove('show');
+  storageSafeSet('androidBannerDismissed', '1');
+});
+
+window.addEventListener('appinstalled', () => {
+  androidBanner.classList.remove('show');
+  deferredInstallPrompt = null;
+});
+
+function storageSafeGet(key){ try { return sessionStorage.getItem(key); } catch(e){ return null; } }
+function storageSafeSet(key,val){ try { sessionStorage.setItem(key,val); } catch(e){} }
+
+// ---------- Service worker (faster, more reliable loading on Android/Chrome) ----------
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
+
+// ---------- State ----------
+let database = {};      // code -> description
+let items = [];         // {code, description, qty}
+let html5QrCode = null;
+let scanning = false;
+
+// ---------- DB upload ----------
+const dbFileInput = document.getElementById('db-file');
+const dbStatus = document.getElementById('db-status');
+const dbTag = document.getElementById('db-tag');
+
+dbFileInput.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (evt) => {
+    try {
+      const data = new Uint8Array(evt.target.result);
+      const wb = XLSX.read(data, {type:'array'});
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, {header:1, defval:''});
+      database = {};
+      let count = 0;
+      // Detect header row and code/description columns
+      let startRow = 0;
+      let codeCol = 0, descCol = 1;
+      if (rows.length > 0) {
+        const header = rows[0].map(h => String(h).toLowerCase().trim());
+        const cIdx = header.findIndex(h => h.includes('cod') || h.includes('sku') || h.includes('barra'));
+        const dIdx = header.findIndex(h => h.includes('desc') || h.includes('nombre') || h.includes('articulo') || h.includes('artículo'));
+        if (cIdx !== -1 || dIdx !== -1) {
+          startRow = 1;
+          if (cIdx !== -1) codeCol = cIdx;
+          if (dIdx !== -1) descCol = dIdx;
+        }
+      }
+      for (let i = startRow; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row || row.length === 0) continue;
+        const code = String(row[codeCol] ?? '').trim();
+        const desc = String(row[descCol] ?? '').trim();
+        if (code) {
+          database[code] = desc;
+          count++;
+        }
+      }
+      dbTag.textContent = count + ' código(s)';
+      dbTag.classList.add('on');
+      dbStatus.textContent = 'Base de datos cargada: ' + count + ' código(s) con descripción.';
+      dbStatus.classList.add('ok');
+    } catch (err) {
+      dbStatus.textContent = 'No se pudo leer el archivo. Verifica el formato.';
+      dbStatus.classList.add('err');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+});
+
+// ---------- Scanner ----------
+const readerWrap = document.getElementById('reader-wrap');
+const scanBtn = document.getElementById('scan-btn');
+const torchBtn = document.getElementById('torch-btn');
+const scanStatus = document.getElementById('scan-status');
+const camTag = document.getElementById('cam-tag');
+const permissionBanner = document.getElementById('permission-banner');
+const permissionMsg = document.getElementById('permission-msg');
+const permissionSteps = document.getElementById('permission-steps');
+const cameraSelect = document.getElementById('camera-select');
+const codeInput = document.getElementById('code-input');
+const descInput = document.getElementById('desc-input');
+const qtyInput = document.getElementById('qty-input');
+
+let torchOn = false;
+let availableCameras = [];
+let chosenCameraId = null;
+
+const formats = [
+  Html5QrcodeSupportedFormats.EAN_13,
+  Html5QrcodeSupportedFormats.EAN_8,
+  Html5QrcodeSupportedFormats.UPC_A,
+  Html5QrcodeSupportedFormats.UPC_E,
+  Html5QrcodeSupportedFormats.CODE_128,
+  Html5QrcodeSupportedFormats.CODE_39,
+  Html5QrcodeSupportedFormats.CODABAR,
+  Html5QrcodeSupportedFormats.ITF,
+  Html5QrcodeSupportedFormats.QR_CODE
+];
+
+function isSecureEnough() {
+  return window.isSecureContext || location.hostname === 'localhost';
+}
+
+function showPermissionBanner(kind) {
+  permissionBanner.classList.add('show');
+  if (kind === 'denied') {
+    permissionMsg.textContent = 'Le negaste el acceso a la cámara a esta página. Actívalo para poder escanear:';
+    permissionSteps.style.display = 'block';
+  } else if (kind === 'notfound') {
+    permissionMsg.textContent = 'No se detectó ninguna cámara en este dispositivo.';
+    permissionSteps.style.display = 'none';
+  } else if (kind === 'insecure') {
+    permissionMsg.textContent = 'Esta página necesita abrirse por HTTPS (o desde "Añadir a pantalla de inicio") para que Safari permita usar la cámara.';
+    permissionSteps.style.display = 'none';
+  } else {
+    permissionMsg.textContent = 'No se pudo acceder a la cámara. Revisa que ninguna otra app la esté usando e inténtalo de nuevo.';
+    permissionSteps.style.display = 'none';
+  }
+}
+function hidePermissionBanner() {
+  permissionBanner.classList.remove('show');
+}
+
+// Rank cameras so the physical back camera is preferred over front/ultrawide-front/telephoto duplicates.
+function pickBackCameraId(cameras) {
+  if (!cameras || cameras.length === 0) return null;
+  if (cameras.length === 1) return cameras[0].id;
+  const back = cameras.find(c => /back|rear|trasera|environment/i.test(c.label) && !/front|user|frontal/i.test(c.label));
+  if (back) return back.id;
+  // iOS Safari often lists the back camera last when labels are unavailable.
+  return cameras[cameras.length - 1].id;
+}
+
+function populateCameraSelect(cameras, selectedId) {
+  if (cameras.length <= 1) {
+    cameraSelect.classList.remove('show');
+    return;
+  }
+  cameraSelect.innerHTML = cameras.map((c, i) =>
+    `<option value="${c.id}" ${c.id === selectedId ? 'selected' : ''}>${c.label || ('Cámara ' + (i+1))}</option>`
+  ).join('');
+  cameraSelect.classList.add('show');
+}
+
+async function startScanner() {
+  if (scanning) return;
+  hidePermissionBanner();
+
+  if (!isSecureEnough()) {
+    showPermissionBanner('insecure');
+    return;
+  }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    showPermissionBanner('generic');
+    scanStatus.textContent = 'Este navegador no soporta acceso a cámara. Usa Safari en iOS 15 o superior.';
+    scanStatus.classList.add('err');
+    return;
+  }
+
+  scanStatus.textContent = 'Solicitando permiso de cámara…';
+  scanStatus.className = 'status-line';
+  camTag.textContent = 'Solicitando permiso…';
+  scanBtn.disabled = true;
+
+  // Step 1: explicitly trigger the iOS permission prompt and confirm access
+  // before handing control to html5-qrcode. This surfaces a clean error early.
+  try {
+    const probeStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    probeStream.getTracks().forEach(t => t.stop());
+  } catch (err) {
+    scanBtn.disabled = false;
+    camTag.textContent = 'Sin permiso';
+    if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+      showPermissionBanner('denied');
+      scanStatus.textContent = 'Permiso denegado.';
+    } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+      showPermissionBanner('notfound');
+      scanStatus.textContent = 'No se encontró cámara.';
+    } else {
+      showPermissionBanner('generic');
+      scanStatus.textContent = 'Error al abrir la cámara: ' + err.name;
+    }
+    scanStatus.classList.add('err');
+    return;
+  }
+
+  // Step 2: enumerate cameras so we can force the rear lens specifically.
+  try {
+    availableCameras = await Html5Qrcode.getCameras();
+  } catch (err) {
+    availableCameras = [];
+  }
+  chosenCameraId = pickBackCameraId(availableCameras);
+  populateCameraSelect(availableCameras, chosenCameraId);
+
+  readerWrap.classList.add('active');
+  try {
+    html5QrCode = new Html5Qrcode("reader", { formatsToSupport: formats, verbose:false });
+    const cameraTarget = chosenCameraId ? chosenCameraId : { facingMode: { ideal: "environment" } };
+    await html5QrCode.start(
+      cameraTarget,
+      { fps: 12, qrbox: { width: 260, height: 160 }, aspectRatio: 1.4 },
+      onScanSuccess,
+      () => {} // ignore per-frame decode errors
+    );
+    scanning = true;
+    scanBtn.disabled = false;
+    scanBtn.textContent = 'Detener escáner';
+    camTag.textContent = 'Cámara activa';
+    camTag.classList.add('on');
+    scanStatus.textContent = 'Apunta la cámara al código de barras.';
+    checkTorchSupport();
+  } catch (err) {
+    scanBtn.disabled = false;
+    readerWrap.classList.remove('active');
+    camTag.textContent = 'Error de cámara';
+    showPermissionBanner('generic');
+    scanStatus.textContent = 'No se pudo iniciar el video de la cámara. Toca "Iniciar escáner" para reintentar.';
+    scanStatus.classList.add('err');
+  }
+}
+
+async function stopScanner(silent) {
+  if (html5QrCode && scanning) {
+    try { await html5QrCode.stop(); await html5QrCode.clear(); } catch(e) {}
+  }
+  scanning = false;
+  torchOn = false;
+  torchBtn.classList.remove('active', 'show');
+  readerWrap.classList.remove('active');
+  scanBtn.textContent = 'Iniciar escáner';
+  camTag.textContent = 'Cámara detenida';
+  camTag.classList.remove('on');
+  if (!silent) scanStatus.textContent = 'Escáner detenido.';
+}
+
+async function checkTorchSupport() {
+  try {
+    const capabilities = html5QrCode.getRunningTrackCapabilities();
+    if (capabilities && capabilities.torch) {
+      torchBtn.classList.add('show');
+    } else {
+      torchBtn.classList.remove('show');
+    }
+  } catch (e) {
+    torchBtn.classList.remove('show');
+  }
+}
+
+torchBtn.addEventListener('click', async () => {
+  if (!scanning || !html5QrCode) return;
+  torchOn = !torchOn;
+  try {
+    await html5QrCode.applyVideoConstraints({ advanced: [{ torch: torchOn }] });
+    torchBtn.classList.toggle('active', torchOn);
+  } catch (e) {
+    torchOn = !torchOn; // revert on failure
+  }
+});
+
+cameraSelect.addEventListener('change', async () => {
+  chosenCameraId = cameraSelect.value;
+  if (scanning) {
+    await stopScanner(true);
+    startScanner();
+  }
+});
+
+function onScanSuccess(decodedText) {
+  codeInput.value = decodedText;
+  applyLookup(decodedText);
+  scanStatus.textContent = 'Código leído: ' + decodedText;
+  scanStatus.classList.add('ok');
+  stopScanner(true);
+  qtyInput.focus();
+  if (navigator.vibrate) navigator.vibrate(60);
+}
+
+scanBtn.addEventListener('click', () => {
+  scanning ? stopScanner() : startScanner();
+});
+
+function applyLookup(code) {
+  if (database.hasOwnProperty(code)) {
+    descInput.value = database[code];
+  } else {
+    descInput.value = '';
+    descInput.placeholder = database && Object.keys(database).length
+      ? 'No encontrado en la base — escribe la descripción'
+      : 'Descripción del artículo';
+  }
+}
+
+codeInput.addEventListener('input', () => {
+  applyLookup(codeInput.value.trim());
+});
+
+// ---------- Add item ----------
+const addBtn = document.getElementById('add-btn');
+const itemsBody = document.getElementById('items-body');
+const itemsTable = document.getElementById('items-table');
+const emptyMsg = document.getElementById('empty-msg');
+const countTag = document.getElementById('count-tag');
+const totalRowsEl = document.getElementById('total-rows');
+const totalQtyEl = document.getElementById('total-qty');
+
+addBtn.addEventListener('click', () => {
+  const code = codeInput.value.trim();
+  const desc = descInput.value.trim();
+  const qty = parseFloat(qtyInput.value);
+
+  if (!code) { flash(codeInput); return; }
+  if (isNaN(qty) || qty <= 0) { flash(qtyInput); return; }
+
+  const existing = items.find(it => it.code === code);
+  if (existing) {
+    existing.qty += qty;
+    if (desc) existing.description = desc;
+  } else {
+    items.push({ code, description: desc, qty });
+  }
+
+  codeInput.value = '';
+  descInput.value = '';
+  descInput.placeholder = 'Descripción del artículo';
+  qtyInput.value = '';
+  codeInput.focus();
+  renderItems();
+});
+
+function flash(el){
+  el.style.borderColor = 'var(--accent)';
+  setTimeout(()=>{ el.style.borderColor = 'var(--border)'; }, 500);
+}
+
+function renderItems() {
+  if (items.length === 0) {
+    itemsTable.style.display = 'none';
+    emptyMsg.style.display = 'block';
+  } else {
+    itemsTable.style.display = 'table';
+    emptyMsg.style.display = 'none';
+    itemsBody.innerHTML = items.map((it, idx) => `
+      <tr>
+        <td class="code">${escapeHtml(it.code)}</td>
+        <td>${escapeHtml(it.description || '—')}</td>
+        <td class="qty"><input type="number" min="0" value="${it.qty}" data-idx="${idx}" class="qty-edit"></td>
+        <td><button class="btn-danger-outline" data-idx="${idx}">Quitar</button></td>
+      </tr>
+    `).join('');
+  }
+  countTag.textContent = items.length + ' artículo' + (items.length === 1 ? '' : 's');
+  totalRowsEl.textContent = items.length;
+  totalQtyEl.textContent = items.reduce((s,it)=>s+Number(it.qty||0),0);
+}
+
+itemsBody.addEventListener('click', (e) => {
+  if (e.target.matches('.btn-danger-outline')) {
+    const idx = Number(e.target.dataset.idx);
+    items.splice(idx, 1);
+    renderItems();
+  }
+});
+itemsBody.addEventListener('change', (e) => {
+  if (e.target.matches('.qty-edit')) {
+    const idx = Number(e.target.dataset.idx);
+    const val = parseFloat(e.target.value);
+    items[idx].qty = isNaN(val) ? 0 : val;
+    renderItems();
+  }
+});
+
+function escapeHtml(str){
+  return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+// ---------- Reset ----------
+document.getElementById('reset-btn').addEventListener('click', () => {
+  if (items.length === 0) return;
+  if (confirm('¿Borrar todos los artículos capturados?')) {
+    items = [];
+    renderItems();
+  }
+});
+
+// ---------- Export ----------
+document.getElementById('export-btn').addEventListener('click', () => {
+  if (items.length === 0) {
+    alert('No hay artículos capturados todavía.');
+    return;
+  }
+  const data = items.map(it => ({
+    'Código': it.code,
+    'Descripción': it.description || '',
+    'Cantidad': it.qty
+  }));
+  const ws = XLSX.utils.json_to_sheet(data);
+  ws['!cols'] = [{wch:18},{wch:40},{wch:12}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Inventario');
+  const now = new Date();
+  const stamp = now.toISOString().slice(0,10);
+  XLSX.writeFile(wb, `inventario_${stamp}.xlsx`);
+});
+
+renderItems();
+</script>
+</body>
+</html>
