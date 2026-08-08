@@ -33,7 +33,7 @@
     --radius:10px;
   }
   *{box-sizing:border-box;}
-  html,body{margin:0;padding:0;}
+  html,body{margin:0;padding:0;overscroll-behavior-y:contain;}
   body{
     background:var(--bg);
     color:var(--text);
@@ -314,26 +314,44 @@
     color:var(--text-dim);
     font-weight:500;
   }
-  table{width:100%;border-collapse:collapse;font-size:13px;}
-  th{
-    text-align:left;
+  #items-list{width:100%;}
+  .item-card{
+    padding:10px 2px;
+    border-bottom:1px solid var(--border);
+  }
+  .item-card:last-child{border-bottom:none;}
+  .item-row-top{
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .item-code{
     font-family:'JetBrains Mono',monospace;
-    font-size:10px;
-    text-transform:uppercase;
-    letter-spacing:.06em;
+    color:var(--accent);
+    font-weight:700;
+    font-size:14px;
+    flex:1;
+    min-width:0;
+    overflow-wrap:break-word;
+  }
+  .item-qty-edit{
+    width:52px;
+    flex:none;
+    padding:6px;
+    margin:0;
+    font-size:13px;
+    text-align:center;
+  }
+  .item-row-top .btn-danger-outline{flex:none;}
+  .item-row-bottom{
+    margin-top:4px;
+    font-size:13px;
     color:var(--text-dim);
-    padding:0 6px 8px;
-    border-bottom:1px solid var(--border);
+    overflow-wrap:break-word;
   }
-  td{
-    padding:10px 6px;
-    border-bottom:1px solid var(--border);
-    vertical-align:middle;
-  }
-  td.code{font-family:'JetBrains Mono',monospace;color:var(--accent);}
-  td.qty{font-family:'JetBrains Mono',monospace;text-align:right;width:56px;}
-  td.qty input{
-    width:56px;padding:6px;margin:0;font-size:13px;text-align:right;
+  .item-row-bottom.unknown{
+    color:var(--accent);
+    font-style:italic;
   }
   .empty-state{
     text-align:center;
@@ -430,7 +448,7 @@
     <div class="row2">
       <div>
         <label for="qty-input">Cantidad</label>
-        <input type="number" id="qty-input" inputmode="decimal" placeholder="0" min="0">
+        <input type="number" id="qty-input" inputmode="decimal" placeholder="1" min="0" value="1">
       </div>
     </div>
     <button class="btn-success" id="add-btn" type="button" style="width:100%;">Agregar a la lista</button>
@@ -438,14 +456,9 @@
 
   <section>
     <h2>Lista capturada <span class="tag" id="count-tag">0 artículos</span></h2>
-    <div id="table-wrap">
+    <div id="list-wrap">
       <div class="empty-state" id="empty-msg">Aún no hay artículos capturados.</div>
-      <table id="items-table" style="display:none;">
-        <thead>
-          <tr><th>Código</th><th>Descripción</th><th style="text-align:right;">Cant.</th><th></th></tr>
-        </thead>
-        <tbody id="items-body"></tbody>
-      </table>
+      <div id="items-list" style="display:none;"></div>
     </div>
     <div class="totals">
       <span>Renglones: <b id="total-rows">0</b></span>
@@ -515,9 +528,45 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+// ---------- Block pull-to-refresh gesture ----------
+(function preventPullToRefresh() {
+  let touchStartY = 0;
+  let armed = false;
+
+  document.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) { armed = false; return; }
+    touchStartY = e.touches[0].clientY;
+    armed = window.scrollY <= 0;
+  }, { passive: true });
+
+  document.addEventListener('touchmove', (e) => {
+    if (!armed || e.touches.length !== 1) return;
+    const deltaY = e.touches[0].clientY - touchStartY;
+    // Only block the very gesture that triggers native pull-to-refresh:
+    // already at the top of the page AND still dragging downward.
+    if (window.scrollY <= 0 && deltaY > 0) {
+      e.preventDefault();
+    } else if (window.scrollY > 0) {
+      armed = false; // normal scrolling took over; stop intercepting
+    }
+  }, { passive: false });
+})();
+
 // ---------- State ----------
 let database = {};      // code -> description
 let items = [];         // {code, description, qty}
+
+// ---------- Confirm before an intentional reload/close when there's unsaved data ----------
+// Note: mobile browsers show their own standard "leave site?" wording here — for
+// security reasons no browser lets a page set custom text in this dialog anymore.
+window.addEventListener('beforeunload', (e) => {
+  const hasPendingItem = codeInput && codeInput.value.trim().length > 0;
+  if (items.length > 0 || hasPendingItem) {
+    e.preventDefault();
+    e.returnValue = '';
+    return '';
+  }
+});
 let html5QrCode = null;
 let scanning = false;
 
@@ -794,6 +843,7 @@ function updateCodeReadout(code) {
 updateCodeReadout('');
 
 let lastCodeFromScan = false;
+let pendingCode = ''; // code currently loaded in the form, awaiting confirmation/save
 
 torchBtn.addEventListener('click', async () => {
   if (!scanning || !html5QrCode) return;
@@ -815,16 +865,29 @@ cameraSelect.addEventListener('change', async () => {
 });
 
 function onScanSuccess(decodedText) {
+  if (decodedText === pendingCode) {
+    // Same barcode still in view — ignore repeat frames.
+    return;
+  }
+  if (pendingCode) {
+    // A different code was just scanned: auto-save the previous pending item first.
+    const rawQty = parseFloat(qtyInput.value);
+    const finalQty = (isNaN(rawQty) || rawQty <= 0) ? 1 : rawQty;
+    commitItem(pendingCode, descInput.value.trim(), finalQty);
+    renderItems();
+  }
+  pendingCode = decodedText;
   codeInput.value = decodedText;
   applyLookup(decodedText);
   updateCodeReadout(decodedText);
+  qtyInput.value = '1';
   lastCodeFromScan = true;
   playBeep();
   scanStatus.textContent = 'Código leído: ' + decodedText;
   scanStatus.classList.add('ok');
-  stopScanner(true);
   qtyInput.focus();
   if (navigator.vibrate) navigator.vibrate(60);
+  // The camera keeps running continuously so the next item can be scanned right away.
 }
 
 scanBtn.addEventListener('click', () => {
@@ -833,39 +896,35 @@ scanBtn.addEventListener('click', () => {
 });
 
 function applyLookup(code) {
+  const hasDb = database && Object.keys(database).length > 0;
   if (database.hasOwnProperty(code)) {
     descInput.value = database[code];
+    descInput.placeholder = 'Descripción del artículo';
+  } else if (hasDb && code) {
+    descInput.value = 'Producto desconocido';
   } else {
     descInput.value = '';
-    descInput.placeholder = database && Object.keys(database).length
-      ? 'No encontrado en la base — escribe la descripción'
-      : 'Descripción del artículo';
+    descInput.placeholder = 'Descripción del artículo';
   }
 }
 
 codeInput.addEventListener('input', () => {
   lastCodeFromScan = false;
-  applyLookup(codeInput.value.trim());
-  updateCodeReadout(codeInput.value.trim());
+  pendingCode = codeInput.value.trim();
+  applyLookup(pendingCode);
+  updateCodeReadout(pendingCode);
 });
 
 // ---------- Add item ----------
 const addBtn = document.getElementById('add-btn');
-const itemsBody = document.getElementById('items-body');
-const itemsTable = document.getElementById('items-table');
+const itemsList = document.getElementById('items-list');
 const emptyMsg = document.getElementById('empty-msg');
 const countTag = document.getElementById('count-tag');
 const totalRowsEl = document.getElementById('total-rows');
 const totalQtyEl = document.getElementById('total-qty');
 
-addBtn.addEventListener('click', () => {
-  const code = codeInput.value.trim();
-  const desc = descInput.value.trim();
-  const qty = parseFloat(qtyInput.value);
-
-  if (!code) { flash(codeInput); return; }
-  if (isNaN(qty) || qty <= 0) { flash(qtyInput); return; }
-
+function commitItem(code, desc, qty) {
+  if (!code || isNaN(qty) || qty <= 0) return;
   const existing = items.find(it => it.code === code);
   if (existing) {
     existing.qty += qty;
@@ -873,23 +932,27 @@ addBtn.addEventListener('click', () => {
   } else {
     items.push({ code, description: desc, qty });
   }
+}
+
+addBtn.addEventListener('click', () => {
+  const code = codeInput.value.trim();
+  const desc = descInput.value.trim();
+  const qty = parseFloat(qtyInput.value);
+  const finalQty = (isNaN(qty) || qty <= 0) ? 1 : qty;
+
+  if (!code) { flash(codeInput); return; }
+
+  commitItem(code, desc, finalQty);
 
   codeInput.value = '';
   descInput.value = '';
   descInput.placeholder = 'Descripción del artículo';
-  qtyInput.value = '';
+  qtyInput.value = '1';
   updateCodeReadout('');
-
-  const shouldResumeScanning = lastCodeFromScan;
+  pendingCode = '';
   lastCodeFromScan = false;
 
-  if (shouldResumeScanning) {
-    scanStatus.textContent = 'Pieza registrada. Reactivando cámara…';
-    scanStatus.classList.remove('err');
-    startScanner();
-  } else {
-    codeInput.focus();
-  }
+  if (!scanning) codeInput.focus();
 
   renderItems();
 });
@@ -901,34 +964,39 @@ function flash(el){
 
 function renderItems() {
   if (items.length === 0) {
-    itemsTable.style.display = 'none';
+    itemsList.style.display = 'none';
     emptyMsg.style.display = 'block';
   } else {
-    itemsTable.style.display = 'table';
+    itemsList.style.display = 'block';
     emptyMsg.style.display = 'none';
-    itemsBody.innerHTML = items.map((it, idx) => `
-      <tr>
-        <td class="code">${escapeHtml(it.code)}</td>
-        <td>${escapeHtml(it.description || '—')}</td>
-        <td class="qty"><input type="number" min="0" value="${it.qty}" data-idx="${idx}" class="qty-edit"></td>
-        <td><button class="btn-danger-outline" data-idx="${idx}">Quitar</button></td>
-      </tr>
-    `).join('');
+    itemsList.innerHTML = items.map((it, idx) => {
+      const isUnknown = it.description === 'Producto desconocido';
+      const descText = it.description ? escapeHtml(it.description) : '—';
+      return `
+      <div class="item-card">
+        <div class="item-row-top">
+          <span class="item-code">${escapeHtml(it.code)}</span>
+          <input type="number" min="0" value="${it.qty}" data-idx="${idx}" class="item-qty-edit">
+          <button class="btn-danger-outline" data-idx="${idx}">Quitar</button>
+        </div>
+        <div class="item-row-bottom${isUnknown ? ' unknown' : ''}">${descText}</div>
+      </div>`;
+    }).join('');
   }
   countTag.textContent = items.length + ' artículo' + (items.length === 1 ? '' : 's');
   totalRowsEl.textContent = items.length;
   totalQtyEl.textContent = items.reduce((s,it)=>s+Number(it.qty||0),0);
 }
 
-itemsBody.addEventListener('click', (e) => {
+itemsList.addEventListener('click', (e) => {
   if (e.target.matches('.btn-danger-outline')) {
     const idx = Number(e.target.dataset.idx);
     items.splice(idx, 1);
     renderItems();
   }
 });
-itemsBody.addEventListener('change', (e) => {
-  if (e.target.matches('.qty-edit')) {
+itemsList.addEventListener('change', (e) => {
+  if (e.target.matches('.item-qty-edit')) {
     const idx = Number(e.target.dataset.idx);
     const val = parseFloat(e.target.value);
     items[idx].qty = isNaN(val) ? 0 : val;
