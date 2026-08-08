@@ -4,8 +4,9 @@
   "description": "Captura de inventario por código de barras con exportación a Excel.",
   "start_url": "./index.html",
   "scope": "./",
+  "id": "/captura-inventario/",
   "display": "standalone",
-  "orientation": "portrait",
+  "orientation": "any",
   "background_color": "#111317",
   "theme_color": "#111317",
   "icons": [
