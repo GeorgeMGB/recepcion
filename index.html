@@ -281,6 +281,39 @@
     margin-bottom:10px;
   }
   select#camera-select.show{display:block;}
+  .code-readout{
+    width:95%;
+    margin:0 auto 16px;
+    background:#000;
+    border:2px solid var(--accent);
+    border-radius:12px;
+    padding:16px 12px;
+    text-align:center;
+    box-shadow:0 0 0 4px rgba(255,68,56,0.08), inset 0 0 24px rgba(255,68,56,0.06);
+  }
+  .code-readout-label{
+    display:block;
+    font-family:'JetBrains Mono',monospace;
+    font-size:10px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--accent);
+    margin-bottom:6px;
+  }
+  #code-readout-text{
+    display:block;
+    font-family:'JetBrains Mono',monospace;
+    font-weight:700;
+    font-size:clamp(26px, 8vw, 42px);
+    line-height:1.15;
+    color:#FFFFFF;
+    letter-spacing:0.02em;
+    word-break:break-all;
+  }
+  .code-readout.pending #code-readout-text{
+    color:var(--text-dim);
+    font-weight:500;
+  }
   table{width:100%;border-collapse:collapse;font-size:13px;}
   th{
     text-align:left;
@@ -386,7 +419,11 @@
 
   <section>
     <h2>Artículo</h2>
-    <label for="code-input">Código</label>
+    <div class="code-readout" id="code-readout" aria-live="polite">
+      <span class="code-readout-label">Código leído</span>
+      <span id="code-readout-text">—</span>
+    </div>
+    <label for="code-input">Código (editable)</label>
     <input type="text" id="code-input" placeholder="Escanea o teclea el código" autocomplete="off">
     <label for="desc-input">Descripción</label>
     <input type="text" id="desc-input" class="field-desc" placeholder="Descripción del artículo" autocomplete="off">
@@ -716,6 +753,48 @@ async function checkTorchSupport() {
   }
 }
 
+// ---------- Audio confirmation beep ----------
+let audioCtx = null;
+function ensureAudioContext() {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+  } catch (e) {}
+  return audioCtx;
+}
+function playBeep() {
+  try {
+    const ctx = ensureAudioContext();
+    if (!ctx) return;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(1760, ctx.currentTime);
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.35, ctx.currentTime + 0.008);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.16);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.18);
+  } catch (e) {}
+}
+
+// ---------- Large code readout ----------
+const codeReadout = document.getElementById('code-readout');
+const codeReadoutText = document.getElementById('code-readout-text');
+function updateCodeReadout(code) {
+  if (code) {
+    codeReadoutText.textContent = code;
+    codeReadout.classList.remove('pending');
+  } else {
+    codeReadoutText.textContent = '—';
+    codeReadout.classList.add('pending');
+  }
+}
+updateCodeReadout('');
+
+let lastCodeFromScan = false;
+
 torchBtn.addEventListener('click', async () => {
   if (!scanning || !html5QrCode) return;
   torchOn = !torchOn;
@@ -738,6 +817,9 @@ cameraSelect.addEventListener('change', async () => {
 function onScanSuccess(decodedText) {
   codeInput.value = decodedText;
   applyLookup(decodedText);
+  updateCodeReadout(decodedText);
+  lastCodeFromScan = true;
+  playBeep();
   scanStatus.textContent = 'Código leído: ' + decodedText;
   scanStatus.classList.add('ok');
   stopScanner(true);
@@ -746,6 +828,7 @@ function onScanSuccess(decodedText) {
 }
 
 scanBtn.addEventListener('click', () => {
+  ensureAudioContext(); // unlock audio on this user gesture so the beep can play later
   scanning ? stopScanner() : startScanner();
 });
 
@@ -761,7 +844,9 @@ function applyLookup(code) {
 }
 
 codeInput.addEventListener('input', () => {
+  lastCodeFromScan = false;
   applyLookup(codeInput.value.trim());
+  updateCodeReadout(codeInput.value.trim());
 });
 
 // ---------- Add item ----------
@@ -793,7 +878,19 @@ addBtn.addEventListener('click', () => {
   descInput.value = '';
   descInput.placeholder = 'Descripción del artículo';
   qtyInput.value = '';
-  codeInput.focus();
+  updateCodeReadout('');
+
+  const shouldResumeScanning = lastCodeFromScan;
+  lastCodeFromScan = false;
+
+  if (shouldResumeScanning) {
+    scanStatus.textContent = 'Pieza registrada. Reactivando cámara…';
+    scanStatus.classList.remove('err');
+    startScanner();
+  } else {
+    codeInput.focus();
+  }
+
   renderItems();
 });
 
