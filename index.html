@@ -39,7 +39,7 @@
     color:var(--text);
     font-family:'Inter',sans-serif;
     -webkit-font-smoothing:antialiased;
-    padding-bottom:64px;
+    padding-bottom:24px;
   }
   .barcode-rule{
     height:14px;
@@ -55,6 +55,52 @@
     backdrop-filter:blur(8px);
     z-index:20;
   }
+  .header-row{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:12px;
+  }
+  .header-text{flex:1;min-width:0;}
+  .menu-wrap{position:relative;flex:none;margin-top:2px;}
+  .menu-btn{
+    width:40px;height:40px;
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    border-radius:8px;
+    color:var(--text-dim);
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .menu-btn.active{border-color:var(--accent);color:var(--accent);}
+  .menu-dropdown{
+    display:none;
+    position:absolute;
+    top:calc(100% + 8px);
+    right:0;
+    width:min(320px, 82vw);
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:14px;
+    box-shadow:0 16px 32px rgba(0,0,0,0.5);
+    z-index:30;
+  }
+  .menu-dropdown.show{display:block;}
+  .menu-dropdown-header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    font-family:'Space Grotesk',sans-serif;
+    font-size:13px;
+    font-weight:600;
+    text-transform:uppercase;
+    letter-spacing:.05em;
+    color:var(--text-dim);
+    margin-bottom:10px;
+  }
+  .menu-dropdown label{margin-top:0;}
   .install-banner{
     display:none;
     align-items:center;
@@ -205,9 +251,16 @@
     background:#000;
     display:none;
     margin-bottom:12px;
+    height:20vh;
+    max-height:20vh;
   }
   #reader-wrap.active{display:block;}
-  #reader{width:100%;}
+  #reader{width:100%;height:100%;}
+  #reader video{
+    width:100% !important;
+    height:100% !important;
+    object-fit:cover !important;
+  }
   .scan-line{
     position:absolute;
     left:6%;right:6%;
@@ -321,37 +374,64 @@
   }
   .item-card:last-child{border-bottom:none;}
   .item-row-top{
-    display:flex;
+    display:grid;
+    grid-template-columns: minmax(0,1fr) 56px auto;
     align-items:center;
     gap:8px;
+    width:100%;
   }
   .item-code{
     font-family:'JetBrains Mono',monospace;
     color:var(--accent);
     font-weight:700;
     font-size:14px;
-    flex:1;
     min-width:0;
-    overflow-wrap:break-word;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
   }
   .item-qty-edit{
-    width:52px;
-    flex:none;
-    padding:6px;
+    width:100%;
+    box-sizing:border-box;
+    padding:6px 4px;
     margin:0;
     font-size:13px;
     text-align:center;
   }
-  .item-row-top .btn-danger-outline{flex:none;}
-  .item-row-bottom{
-    margin-top:4px;
-    font-size:13px;
-    color:var(--text-dim);
-    overflow-wrap:break-word;
+  .item-row-top .btn-danger-outline{
+    white-space:nowrap;
   }
-  .item-row-bottom.unknown{
+  .item-row-bottom{
+    margin-top:5px;
+    display:flex;
+    align-items:baseline;
+    gap:8px;
+    font-size:13px;
+  }
+  .item-desc{
+    max-width:50%;
+    flex:0 1 auto;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    color:var(--text-dim);
+  }
+  .item-desc.unknown{
     color:var(--accent);
     font-style:italic;
+  }
+  .item-sku{
+    font-family:'JetBrains Mono',monospace;
+    font-size:12px;
+    color:var(--text-dim);
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    max-width:48%;
+    flex:none;
+  }
+  .item-sku.unknown{
+    color:var(--accent);
   }
   .empty-state{
     text-align:center;
@@ -370,19 +450,52 @@
     border-top:1px dashed var(--border);
   }
   .totals b{color:var(--text);}
-  footer.actions{
-    max-width:640px;margin:0 auto;
-    padding:0 16px;
-    display:flex;gap:10px;
+  .menu-divider{
+    height:1px;
+    background:var(--border);
+    margin:14px 0;
+  }
+  .menu-actions{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
   }
 </style>
 </head>
 <body>
 
 <header>
-  <div class="eyebrow">Lector activo</div>
-  <h1>Captura de Inventario</h1>
-  <div class="sub">Escanea, teclea cantidad, exporta a Excel.</div>
+  <div class="header-row">
+    <div class="header-text">
+      <div class="eyebrow">Lector activo</div>
+      <h1>Captura de Inventario</h1>
+      <div class="sub">Escanea, teclea cantidad, exporta a Excel.</div>
+    </div>
+    <div class="menu-wrap">
+      <button class="menu-btn" id="menu-btn" type="button" aria-label="Abrir menú" aria-expanded="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/><path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/></svg>
+      </button>
+      <div class="menu-dropdown" id="menu-dropdown">
+        <div class="menu-dropdown-header">
+          <span>Base de datos</span>
+          <span class="tag" id="db-tag">No cargada</span>
+        </div>
+        <label for="db-file">Archivo opcional (.xlsx / .csv) con columnas de código, descripción y SKU (opcional)</label>
+        <input type="file" id="db-file" accept=".xlsx,.xls,.csv">
+        <div class="status-line" id="db-status">Sin base de datos: la descripción se capturará manualmente.</div>
+
+        <div class="menu-divider"></div>
+
+        <div class="menu-dropdown-header">
+          <span>Lista capturada</span>
+        </div>
+        <div class="menu-actions">
+          <button class="btn-primary" id="export-btn" type="button">Exportar a Excel</button>
+          <button class="btn-ghost" id="reset-btn" type="button">Reiniciar lista</button>
+        </div>
+      </div>
+    </div>
+  </div>
 </header>
 <div class="install-banner" id="ios-install-banner">
   <svg class="share-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M12 4l-4 4M12 4l4 4"/><path d="M4 14v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/></svg>
@@ -398,13 +511,6 @@
 <div class="barcode-rule"></div>
 
 <main>
-
-  <section id="db-section">
-    <h2>Base de datos <span class="tag" id="db-tag">No cargada</span></h2>
-    <label for="db-file">Archivo opcional (.xlsx / .csv) con columnas de código y descripción</label>
-    <input type="file" id="db-file" accept=".xlsx,.xls,.csv">
-    <div class="status-line" id="db-status">Sin base de datos: la descripción se capturará manualmente.</div>
-  </section>
 
   <section>
     <h2>Escanear artículo <span class="tag" id="cam-tag">Cámara no iniciada</span></h2>
@@ -467,11 +573,6 @@
   </section>
 
 </main>
-
-<footer class="actions">
-  <button class="btn-ghost" id="reset-btn" type="button">Reiniciar lista</button>
-  <button class="btn-primary" id="export-btn" type="button">Exportar a Excel</button>
-</footer>
 
 <script>
 // ---------- Add-to-Home-Screen: iOS ----------
@@ -553,7 +654,7 @@ if ('serviceWorker' in navigator) {
 })();
 
 // ---------- State ----------
-let database = {};      // code -> description
+let database = {};      // code -> { description, sku }
 let items = [];         // {code, description, qty}
 
 // ---------- Confirm before an intentional reload/close when there's unsaved data ----------
@@ -571,6 +672,26 @@ let html5QrCode = null;
 let scanning = false;
 
 // ---------- DB upload ----------
+// ---------- Header dropdown menu (database block) ----------
+const menuBtn = document.getElementById('menu-btn');
+const menuDropdown = document.getElementById('menu-dropdown');
+
+menuBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const willOpen = !menuDropdown.classList.contains('show');
+  menuDropdown.classList.toggle('show', willOpen);
+  menuBtn.classList.toggle('active', willOpen);
+  menuBtn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+});
+
+menuDropdown.addEventListener('click', (e) => e.stopPropagation());
+
+document.addEventListener('click', () => {
+  menuDropdown.classList.remove('show');
+  menuBtn.classList.remove('active');
+  menuBtn.setAttribute('aria-expanded', 'false');
+});
+
 const dbFileInput = document.getElementById('db-file');
 const dbStatus = document.getElementById('db-status');
 const dbTag = document.getElementById('db-tag');
@@ -587,17 +708,19 @@ dbFileInput.addEventListener('change', (e) => {
       const rows = XLSX.utils.sheet_to_json(sheet, {header:1, defval:''});
       database = {};
       let count = 0;
-      // Detect header row and code/description columns
+      // Detect header row and code / description / SKU columns
       let startRow = 0;
-      let codeCol = 0, descCol = 1;
+      let codeCol = 0, descCol = 1, skuCol = -1;
       if (rows.length > 0) {
         const header = rows[0].map(h => String(h).toLowerCase().trim());
-        const cIdx = header.findIndex(h => h.includes('cod') || h.includes('sku') || h.includes('barra'));
+        const cIdx = header.findIndex(h => h.includes('cod') || h.includes('barra'));
         const dIdx = header.findIndex(h => h.includes('desc') || h.includes('nombre') || h.includes('articulo') || h.includes('artículo'));
-        if (cIdx !== -1 || dIdx !== -1) {
+        const sIdx = header.findIndex(h => h.includes('sku'));
+        if (cIdx !== -1 || dIdx !== -1 || sIdx !== -1) {
           startRow = 1;
           if (cIdx !== -1) codeCol = cIdx;
           if (dIdx !== -1) descCol = dIdx;
+          if (sIdx !== -1) skuCol = sIdx;
         }
       }
       for (let i = startRow; i < rows.length; i++) {
@@ -605,14 +728,15 @@ dbFileInput.addEventListener('change', (e) => {
         if (!row || row.length === 0) continue;
         const code = String(row[codeCol] ?? '').trim();
         const desc = String(row[descCol] ?? '').trim();
+        const sku = skuCol !== -1 ? String(row[skuCol] ?? '').trim() : '';
         if (code) {
-          database[code] = desc;
+          database[code] = { description: desc, sku: sku };
           count++;
         }
       }
       dbTag.textContent = count + ' código(s)';
       dbTag.classList.add('on');
-      dbStatus.textContent = 'Base de datos cargada: ' + count + ' código(s) con descripción.';
+      dbStatus.textContent = 'Base de datos cargada: ' + count + ' código(s)' + (skuCol !== -1 ? ' con descripción y SKU.' : ' con descripción.');
       dbStatus.classList.add('ok');
     } catch (err) {
       dbStatus.textContent = 'No se pudo leer el archivo. Verifica el formato.';
@@ -754,7 +878,14 @@ async function startScanner() {
     const cameraTarget = chosenCameraId ? chosenCameraId : { facingMode: { ideal: "environment" } };
     await html5QrCode.start(
       cameraTarget,
-      { fps: 12, qrbox: { width: 260, height: 160 }, aspectRatio: 1.4 },
+      {
+        fps: 12,
+        qrbox: (viewfinderWidth, viewfinderHeight) => ({
+          width: Math.floor(viewfinderWidth * 0.88),
+          height: Math.floor(viewfinderHeight * 0.62)
+        }),
+        aspectRatio: 1.4
+      },
       onScanSuccess,
       () => {} // ignore per-frame decode errors
     );
@@ -873,7 +1004,7 @@ function onScanSuccess(decodedText) {
     // A different code was just scanned: auto-save the previous pending item first.
     const rawQty = parseFloat(qtyInput.value);
     const finalQty = (isNaN(rawQty) || rawQty <= 0) ? 1 : rawQty;
-    commitItem(pendingCode, descInput.value.trim(), finalQty);
+    commitItem(pendingCode, descInput.value.trim(), finalQty, pendingSku);
     renderItems();
   }
   pendingCode = decodedText;
@@ -895,16 +1026,22 @@ scanBtn.addEventListener('click', () => {
   scanning ? stopScanner() : startScanner();
 });
 
+let pendingSku = ''; // resolved SKU for the code currently loaded in the form
+
 function applyLookup(code) {
   const hasDb = database && Object.keys(database).length > 0;
-  if (database.hasOwnProperty(code)) {
-    descInput.value = database[code];
+  const entry = database[code];
+  if (entry) {
+    descInput.value = entry.description || '';
     descInput.placeholder = 'Descripción del artículo';
+    pendingSku = entry.sku ? entry.sku.trim() : '';
   } else if (hasDb && code) {
     descInput.value = 'Producto desconocido';
+    pendingSku = '';
   } else {
     descInput.value = '';
     descInput.placeholder = 'Descripción del artículo';
+    pendingSku = '';
   }
 }
 
@@ -923,14 +1060,15 @@ const countTag = document.getElementById('count-tag');
 const totalRowsEl = document.getElementById('total-rows');
 const totalQtyEl = document.getElementById('total-qty');
 
-function commitItem(code, desc, qty) {
+function commitItem(code, desc, qty, sku) {
   if (!code || isNaN(qty) || qty <= 0) return;
   const existing = items.find(it => it.code === code);
   if (existing) {
     existing.qty += qty;
     if (desc) existing.description = desc;
+    if (sku) existing.sku = sku;
   } else {
-    items.push({ code, description: desc, qty });
+    items.push({ code, description: desc, sku: sku || '', qty });
   }
 }
 
@@ -942,7 +1080,7 @@ addBtn.addEventListener('click', () => {
 
   if (!code) { flash(codeInput); return; }
 
-  commitItem(code, desc, finalQty);
+  commitItem(code, desc, finalQty, pendingSku);
 
   codeInput.value = '';
   descInput.value = '';
@@ -950,6 +1088,7 @@ addBtn.addEventListener('click', () => {
   qtyInput.value = '1';
   updateCodeReadout('');
   pendingCode = '';
+  pendingSku = '';
   lastCodeFromScan = false;
 
   if (!scanning) codeInput.focus();
@@ -972,14 +1111,19 @@ function renderItems() {
     itemsList.innerHTML = items.map((it, idx) => {
       const isUnknown = it.description === 'Producto desconocido';
       const descText = it.description ? escapeHtml(it.description) : '—';
+      const skuText = it.sku && it.sku.trim() ? escapeHtml(it.sku.trim()) : 'No encontrado';
+      const skuClass = it.sku && it.sku.trim() ? '' : ' unknown';
       return `
       <div class="item-card">
         <div class="item-row-top">
-          <span class="item-code">${escapeHtml(it.code)}</span>
+          <span class="item-code" title="${escapeHtml(it.code)}">${escapeHtml(it.code)}</span>
           <input type="number" min="0" value="${it.qty}" data-idx="${idx}" class="item-qty-edit">
           <button class="btn-danger-outline" data-idx="${idx}">Quitar</button>
         </div>
-        <div class="item-row-bottom${isUnknown ? ' unknown' : ''}">${descText}</div>
+        <div class="item-row-bottom">
+          <span class="item-desc${isUnknown ? ' unknown' : ''}" title="${descText}">${descText}</span>
+          <span class="item-sku${skuClass}">SKU: ${skuText}</span>
+        </div>
       </div>`;
     }).join('');
   }
@@ -1009,32 +1153,42 @@ function escapeHtml(str){
 }
 
 // ---------- Reset ----------
+function closeMenu() {
+  menuDropdown.classList.remove('show');
+  menuBtn.classList.remove('active');
+  menuBtn.setAttribute('aria-expanded', 'false');
+}
+
 document.getElementById('reset-btn').addEventListener('click', () => {
-  if (items.length === 0) return;
+  if (items.length === 0) { closeMenu(); return; }
   if (confirm('¿Borrar todos los artículos capturados?')) {
     items = [];
     renderItems();
   }
+  closeMenu();
 });
 
 // ---------- Export ----------
 document.getElementById('export-btn').addEventListener('click', () => {
   if (items.length === 0) {
     alert('No hay artículos capturados todavía.');
+    closeMenu();
     return;
   }
   const data = items.map(it => ({
     'Código': it.code,
+    'SKU': (it.sku && it.sku.trim()) ? it.sku.trim() : 'No encontrado',
     'Descripción': it.description || '',
     'Cantidad': it.qty
   }));
   const ws = XLSX.utils.json_to_sheet(data);
-  ws['!cols'] = [{wch:18},{wch:40},{wch:12}];
+  ws['!cols'] = [{wch:18},{wch:16},{wch:40},{wch:12}];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Inventario');
   const now = new Date();
   const stamp = now.toISOString().slice(0,10);
   XLSX.writeFile(wb, `inventario_${stamp}.xlsx`);
+  closeMenu();
 });
 
 renderItems();
