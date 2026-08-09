@@ -302,8 +302,8 @@
     background:#000;
     display:none;
     margin-bottom:12px;
-    height:20vh;
-    max-height:20vh;
+    height:17vh;
+    max-height:17vh;
   }
   #reader-wrap.active{display:block;}
   #reader{width:100%;height:100%;}
@@ -358,12 +358,14 @@
   .permission-banner b{color:var(--accent);}
   .permission-banner ol{margin:6px 0 0;padding-left:18px;}
   .scan-controls{display:flex;gap:8px;}
-  .scan-controls .btn-primary{flex:1;}
+  .scan-controls .btn-primary{flex:1;height:46px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;}
   .btn-icon{
     background:var(--panel-2);
     border:1px solid var(--border);
     color:var(--text);
     width:48px;
+    height:46px;
+    box-sizing:border-box;
     flex:none;
     display:none;
     align-items:center;
@@ -391,7 +393,7 @@
     background:#000;
     border:2px solid var(--accent);
     border-radius:12px;
-    padding:16px 12px;
+    padding:14px 10px;
     text-align:center;
     box-shadow:0 0 0 4px rgba(255,68,56,0.08), inset 0 0 24px rgba(255,68,56,0.06);
   }
@@ -692,23 +694,25 @@ if ('serviceWorker' in navigator) {
 }
 
 // ---------- Best-effort browser-chrome auto-hide ----------
-// Mobile browsers reserve full control over their own address/nav bars for security
-// reasons (a page cannot fake or force-hide them at will). These are the two
-// legitimate techniques a web page is allowed to use:
-// 1) A tiny scroll nudge right after load, which is what encourages Safari/Chrome
-//    to collapse their toolbar the same way a manual scroll does.
-// 2) The Fullscreen API on the very first tap — supported on Android/desktop Chrome,
-//    ignored by iOS Safari for normal tabs (Apple blocks it outright there).
-// The one guaranteed zero-chrome experience on iPhone remains "Añadir a pantalla de
-// inicio" (already prompted elsewhere in this app), since standalone mode has no
-// address/nav bar at all, always — not just while scrolling.
+// Important platform limit, stated plainly: no website can force-hide the address bar
+// without any user interaction — Chrome, Safari and Firefox all require a real user
+// gesture (a tap) before granting Fullscreen, specifically to stop pages from faking
+// or hijacking browser chrome. So a pure "2 seconds after load, no tap needed" hide is
+// not something any web page can do. What IS real and implemented here:
+// 1) A scroll nudge 2 seconds after load — the same passive signal a manual scroll
+//    sends to Safari/Chrome to collapse their toolbar. Effect varies by browser/version.
+// 2) True fullscreen (bar fully gone) on the first tap, for Chrome on Android/desktop —
+//    iOS Safari blocks the Fullscreen API outright for normal tabs.
+// 3) Once in fullscreen, scrolling all the way to the bottom of the page exits
+//    fullscreen automatically, which brings the address bar back — exiting never
+//    needs a gesture, so this part works reliably in Chrome. Re-hiding it afterward
+//    needs one more tap, since browsers won't let a scroll event re-grant fullscreen.
 function nudgeChromeCollapse() {
   window.scrollTo(0, 1);
   setTimeout(() => window.scrollTo(0, 0), 50);
 }
 window.addEventListener('load', () => {
-  setTimeout(nudgeChromeCollapse, 150);
-  setTimeout(nudgeChromeCollapse, 600);
+  setTimeout(nudgeChromeCollapse, 2000);
 });
 
 document.addEventListener('touchstart', function enableFullscreenOnce() {
@@ -718,6 +722,13 @@ document.addEventListener('touchstart', function enableFullscreenOnce() {
   }
   document.removeEventListener('touchstart', enableFullscreenOnce);
 }, { once: true, passive: true });
+
+window.addEventListener('scroll', () => {
+  const scrolledToBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4;
+  if (scrolledToBottom && document.fullscreenElement) {
+    document.exitFullscreen().catch(() => {});
+  }
+}, { passive: true });
 
 // ---------- Block pull-to-refresh gesture ----------
 (function preventPullToRefresh() {
