@@ -182,15 +182,25 @@
     color:var(--text-dim);
   }
   .tag.on{background:var(--success-soft);border-color:var(--success);color:var(--success);}
+  .qty-add-group{
+    display:flex;
+    align-items:stretch;
+    gap:8px;
+    width:64%;
+    flex:0 0 64%;
+    text-transform:none;
+    letter-spacing:normal;
+  }
+  .qty-add-group > .qty-inline,
+  .qty-add-group > #add-btn{
+    flex:1 1 0;
+    width:auto;
+  }
   .qty-inline{
-    width:30%;
-    flex:0 0 30%;
     display:flex;
     align-items:center;
     justify-content:flex-end;
     gap:6px;
-    text-transform:none;
-    letter-spacing:normal;
   }
   .qty-inline label{
     margin:0;
@@ -202,11 +212,25 @@
   }
   .qty-inline input{
     width:100%;
+    min-width:0;
     max-width:100%;
+    height:46px;
     margin:0;
     padding:8px 6px;
     text-align:center;
     font-size:15px;
+    box-sizing:border-box;
+  }
+  .qty-add-group #add-btn{
+    height:46px;
+    margin:0;
+    padding:8px 6px;
+    font-size:13px;
+    white-space:nowrap;
+    box-sizing:border-box;
+    display:flex;
+    align-items:center;
+    justify-content:center;
   }
   .visually-hidden-field{
     display:none;
@@ -380,19 +404,28 @@
     color:var(--accent);
     margin-bottom:6px;
   }
-  #code-readout-text{
+  .code-readout-input{
     display:block;
+    width:100%;
+    background:transparent;
+    border:none;
+    outline:none;
+    text-align:center;
     font-family:'JetBrains Mono',monospace;
     font-weight:700;
-    font-size:clamp(26px, 8vw, 42px);
+    font-size:clamp(24px, 8vw, 42px);
     line-height:1.15;
     color:#FFFFFF;
     letter-spacing:0.02em;
-    word-break:break-all;
+    padding:0;
+    margin:0;
+    -webkit-appearance:none;
   }
-  .code-readout.pending #code-readout-text{
+  .code-readout-input::placeholder{
     color:var(--text-dim);
     font-weight:500;
+    font-size:clamp(15px, 4.5vw, 18px);
+    letter-spacing:normal;
   }
   #items-list{width:100%;}
   .item-card{
@@ -477,24 +510,6 @@
     border-bottom:1px dashed var(--border);
   }
   .totals b{color:var(--text);}
-  .code-row{
-    display:flex;
-    align-items:stretch;
-    gap:10px;
-  }
-  .code-row input{
-    flex:1 1 auto;
-    min-width:0;
-    margin-bottom:0;
-  }
-  .code-row button{
-    flex:0 0 25%;
-    width:25%;
-    margin:0;
-    padding-left:6px;
-    padding-right:6px;
-    white-space:nowrap;
-  }
   .menu-divider{
     height:1px;
     background:var(--border);
@@ -589,19 +604,17 @@
   <section>
     <h2 class="h2-with-qty">
       <span>Artículo</span>
-      <span class="qty-inline">
-        <label for="qty-input">Cant.</label>
-        <input type="number" id="qty-input" inputmode="decimal" placeholder="1" min="0" value="1">
+      <span class="qty-add-group">
+        <span class="qty-inline">
+          <label for="qty-input">Cant.</label>
+          <input type="number" id="qty-input" inputmode="decimal" placeholder="1" min="0" value="1">
+        </span>
+        <button class="btn-success" id="add-btn" type="button">Agregar</button>
       </span>
     </h2>
     <div class="code-readout" id="code-readout" aria-live="polite">
-      <span class="code-readout-label">Código leído</span>
-      <span id="code-readout-text">—</span>
-    </div>
-    <label for="code-input">Código (editable)</label>
-    <div class="code-row">
-      <input type="text" id="code-input" placeholder="Teclea el código" autocomplete="off">
-      <button class="btn-success" id="add-btn" type="button">Agregar</button>
+      <span class="code-readout-label">Código (escaneo o manual)</span>
+      <input type="text" id="code-input" class="code-readout-input" placeholder="Teclea o escanea aquí" autocomplete="off" autocapitalize="characters" spellcheck="false">
     </div>
     <div class="visually-hidden-field">
       <label for="desc-input">Descripción</label>
@@ -677,6 +690,34 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   });
 }
+
+// ---------- Best-effort browser-chrome auto-hide ----------
+// Mobile browsers reserve full control over their own address/nav bars for security
+// reasons (a page cannot fake or force-hide them at will). These are the two
+// legitimate techniques a web page is allowed to use:
+// 1) A tiny scroll nudge right after load, which is what encourages Safari/Chrome
+//    to collapse their toolbar the same way a manual scroll does.
+// 2) The Fullscreen API on the very first tap — supported on Android/desktop Chrome,
+//    ignored by iOS Safari for normal tabs (Apple blocks it outright there).
+// The one guaranteed zero-chrome experience on iPhone remains "Añadir a pantalla de
+// inicio" (already prompted elsewhere in this app), since standalone mode has no
+// address/nav bar at all, always — not just while scrolling.
+function nudgeChromeCollapse() {
+  window.scrollTo(0, 1);
+  setTimeout(() => window.scrollTo(0, 0), 50);
+}
+window.addEventListener('load', () => {
+  setTimeout(nudgeChromeCollapse, 150);
+  setTimeout(nudgeChromeCollapse, 600);
+});
+
+document.addEventListener('touchstart', function enableFullscreenOnce() {
+  const el = document.documentElement;
+  if (el.requestFullscreen) {
+    el.requestFullscreen().catch(() => {});
+  }
+  document.removeEventListener('touchstart', enableFullscreenOnce);
+}, { once: true, passive: true });
 
 // ---------- Block pull-to-refresh gesture ----------
 (function preventPullToRefresh() {
@@ -808,6 +849,19 @@ const cameraSelect = document.getElementById('camera-select');
 const codeInput = document.getElementById('code-input');
 const descInput = document.getElementById('desc-input');
 const qtyInput = document.getElementById('qty-input');
+
+// The default "1" is just a starting suggestion: it clears the instant you tap in,
+// and only comes back (to actually count toward the record) if you leave it untouched.
+qtyInput.addEventListener('focus', () => {
+  if (qtyInput.value === '1') {
+    qtyInput.value = '';
+  }
+});
+qtyInput.addEventListener('blur', () => {
+  if (qtyInput.value.trim() === '') {
+    qtyInput.value = '1';
+  }
+});
 
 let torchOn = false;
 let availableCameras = [];
@@ -1008,17 +1062,25 @@ function playBeep() {
   } catch (e) {}
 }
 
-// ---------- Large code readout ----------
+// ---------- Large code readout (now the editable input itself) ----------
 const codeReadout = document.getElementById('code-readout');
-const codeReadoutText = document.getElementById('code-readout-text');
+
+function autosizeReadout(code) {
+  const len = (code || '').length;
+  let size;
+  if (len <= 10) size = 'clamp(24px, 8vw, 42px)';
+  else if (len <= 16) size = 'clamp(19px, 6vw, 32px)';
+  else size = 'clamp(15px, 4.5vw, 24px)';
+  codeInput.style.fontSize = size;
+}
+
 function updateCodeReadout(code) {
   if (code) {
-    codeReadoutText.textContent = code;
     codeReadout.classList.remove('pending');
   } else {
-    codeReadoutText.textContent = '—';
     codeReadout.classList.add('pending');
   }
+  autosizeReadout(code);
 }
 updateCodeReadout('');
 
