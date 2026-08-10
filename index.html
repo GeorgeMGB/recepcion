@@ -161,9 +161,6 @@
     padding:16px;
     margin-bottom:16px;
   }
-  .section-articulo{
-    padding-bottom:11px;
-  }
   section h2{
     font-family:'Space Grotesk',sans-serif;
     font-size:14px;
@@ -396,11 +393,11 @@
   }
   .code-readout{
     width:95%;
-    margin:0 auto 11px;
+    margin:0 auto 16px;
     background:#000;
     border:2px solid var(--accent);
     border-radius:12px;
-    padding:6px 10px 10px;
+    padding:6px 10px 14px;
     text-align:center;
     box-shadow:0 0 0 4px rgba(255,68,56,0.08), inset 0 0 24px rgba(255,68,56,0.06);
   }
@@ -615,7 +612,7 @@
     <div class="status-line" id="scan-status">Toca "Iniciar escáner" y autoriza el uso de la cámara cuando el navegador lo pida.</div>
   </section>
 
-  <section class="section-articulo">
+  <section>
     <h2 class="h2-with-qty">
       <span>Artículo</span>
       <span class="qty-add-group">
@@ -1151,19 +1148,7 @@ cameraSelect.addEventListener('change', async () => {
   }
 });
 
-// If a code is exactly 14 digits, drop the first and last digit and keep the
-// middle 12. Codes of 12 digits or fewer (or any non-14-digit length) are stored
-// exactly as read.
-function normalizeCode(rawCode) {
-  const code = (rawCode || '').trim();
-  if (/^\d{14}$/.test(code)) {
-    return code.slice(1, -1);
-  }
-  return code;
-}
-
-function onScanSuccess(rawDecodedText) {
-  const decodedText = normalizeCode(rawDecodedText);
+function onScanSuccess(decodedText) {
   if (decodedText === pendingCode) {
     // Same barcode still in view — ignore repeat frames.
     return;
@@ -1215,12 +1200,7 @@ function applyLookup(code) {
 
 codeInput.addEventListener('input', () => {
   lastCodeFromScan = false;
-  const typed = codeInput.value.trim();
-  const normalized = normalizeCode(typed);
-  if (normalized !== typed) {
-    codeInput.value = normalized; // auto-trim the instant a 14-digit code is completed
-  }
-  pendingCode = normalized;
+  pendingCode = codeInput.value.trim();
   applyLookup(pendingCode);
   updateCodeReadout(pendingCode);
 });
@@ -1234,15 +1214,14 @@ const totalRowsEl = document.getElementById('total-rows');
 const totalQtyEl = document.getElementById('total-qty');
 
 function commitItem(code, desc, qty, sku) {
-  const normalizedCode = normalizeCode(code);
-  if (!normalizedCode || isNaN(qty) || qty <= 0) return;
-  const existing = items.find(it => it.code === normalizedCode);
+  if (!code || isNaN(qty) || qty <= 0) return;
+  const existing = items.find(it => it.code === code);
   if (existing) {
     existing.qty += qty;
     if (desc) existing.description = desc;
     if (sku) existing.sku = sku;
   } else {
-    items.push({ code: normalizedCode, description: desc, sku: sku || '', qty });
+    items.push({ code, description: desc, sku: sku || '', qty });
   }
 }
 
