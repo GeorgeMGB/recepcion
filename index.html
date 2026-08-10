@@ -357,8 +357,14 @@
   .permission-banner.show{display:block;}
   .permission-banner b{color:var(--accent);}
   .permission-banner ol{margin:6px 0 0;padding-left:18px;}
-  .scan-controls{display:flex;gap:8px;}
+  .scan-controls{display:flex;align-items:center;gap:8px;}
   .scan-controls .btn-primary{flex:1;height:46px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;}
+  .camera-menu-wrap{
+    position:relative;
+    flex:none;
+    display:none;
+  }
+  .camera-menu-wrap.show{display:flex;}
   .btn-icon{
     background:var(--panel-2);
     border:1px solid var(--border);
@@ -374,8 +380,8 @@
   }
   .btn-icon.show{display:flex;}
   .btn-icon.active{background:var(--accent);border-color:var(--accent);}
+  .menu-dropdown-left{left:0;right:auto;}
   select#camera-select{
-    display:none;
     width:100%;
     background:var(--panel-2);
     border:1px solid var(--border);
@@ -384,16 +390,14 @@
     color:var(--text);
     font-family:'JetBrains Mono',monospace;
     font-size:13px;
-    margin-bottom:10px;
   }
-  select#camera-select.show{display:block;}
   .code-readout{
     width:95%;
     margin:0 auto 16px;
     background:#000;
     border:2px solid var(--accent);
     border-radius:12px;
-    padding:14px 10px;
+    padding:6px 10px 14px;
     text-align:center;
     box-shadow:0 0 0 4px rgba(255,68,56,0.08), inset 0 0 24px rgba(255,68,56,0.06);
   }
@@ -404,7 +408,7 @@
     letter-spacing:.14em;
     text-transform:uppercase;
     color:var(--accent);
-    margin-bottom:6px;
+    margin-bottom:3px;
   }
   .code-readout-input{
     display:block;
@@ -561,7 +565,7 @@
 </header>
 <div class="install-banner" id="ios-install-banner">
   <svg class="share-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M12 4l-4 4M12 4l4 4"/><path d="M4 14v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/></svg>
-  <div><b>Ábrela sin la barra de Safari:</b> toca Compartir → "Añadir a pantalla de inicio". Se abrirá como app completa.</div>
+  <div><b>Ábrela sin la barra del navegador:</b> toca Compartir → "Añadir a pantalla de inicio". Se abrirá como app completa.</div>
   <button class="close-x" id="ios-install-close" aria-label="Cerrar">✕</button>
 </div>
 <div class="install-banner" id="chrome-install-banner">
@@ -582,13 +586,11 @@
       <div id="permission-msg">Actívalo para poder escanear:</div>
       <ol id="permission-steps">
         <li>Abre <b>Ajustes</b> del iPhone</li>
-        <li>Baja hasta <b>Safari</b> → <b>Cámara</b></li>
+        <li>Baja hasta <b>Navegador</b> → <b>Cámara</b></li>
         <li>Selecciona <b>Permitir</b></li>
         <li>Vuelve aquí y toca "Reintentar"</li>
       </ol>
     </div>
-
-    <select id="camera-select"></select>
 
     <div id="reader-wrap">
       <div id="reader"></div>
@@ -597,10 +599,17 @@
     </div>
 
     <div class="scan-controls">
+      <div class="camera-menu-wrap" id="camera-menu-wrap">
+        <button class="menu-btn" id="camera-menu-btn" type="button" aria-label="Seleccionar cámara" aria-expanded="false">📷</button>
+        <div class="menu-dropdown menu-dropdown-left" id="camera-menu-dropdown">
+          <div class="menu-dropdown-header"><span>Cámara</span></div>
+          <select id="camera-select"></select>
+        </div>
+      </div>
       <button class="btn-primary" id="scan-btn" type="button">Iniciar escáner</button>
       <button class="btn-icon" id="torch-btn" type="button" title="Linterna">💡</button>
     </div>
-    <div class="status-line" id="scan-status">Toca "Iniciar escáner" y autoriza el uso de la cámara cuando Safari lo pida.</div>
+    <div class="status-line" id="scan-status">Toca "Iniciar escáner" y autoriza el uso de la cámara cuando el navegador lo pida.</div>
   </section>
 
   <section>
@@ -857,6 +866,25 @@ const permissionBanner = document.getElementById('permission-banner');
 const permissionMsg = document.getElementById('permission-msg');
 const permissionSteps = document.getElementById('permission-steps');
 const cameraSelect = document.getElementById('camera-select');
+const cameraMenuWrap = document.getElementById('camera-menu-wrap');
+const cameraMenuBtn = document.getElementById('camera-menu-btn');
+const cameraMenuDropdown = document.getElementById('camera-menu-dropdown');
+
+cameraMenuBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const willOpen = !cameraMenuDropdown.classList.contains('show');
+  cameraMenuDropdown.classList.toggle('show', willOpen);
+  cameraMenuBtn.classList.toggle('active', willOpen);
+  cameraMenuBtn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+});
+cameraMenuDropdown.addEventListener('click', (e) => e.stopPropagation());
+function closeCameraMenu() {
+  cameraMenuDropdown.classList.remove('show');
+  cameraMenuBtn.classList.remove('active');
+  cameraMenuBtn.setAttribute('aria-expanded', 'false');
+}
+document.addEventListener('click', closeCameraMenu);
+
 const codeInput = document.getElementById('code-input');
 const descInput = document.getElementById('desc-input');
 const qtyInput = document.getElementById('qty-input');
@@ -903,7 +931,7 @@ function showPermissionBanner(kind) {
     permissionMsg.textContent = 'No se detectó ninguna cámara en este dispositivo.';
     permissionSteps.style.display = 'none';
   } else if (kind === 'insecure') {
-    permissionMsg.textContent = 'Esta página necesita abrirse por HTTPS (o desde "Añadir a pantalla de inicio") para que Safari permita usar la cámara.';
+    permissionMsg.textContent = 'Esta página necesita abrirse por HTTPS (o desde "Añadir a pantalla de inicio") para que el navegador permita usar la cámara.';
     permissionSteps.style.display = 'none';
   } else {
     permissionMsg.textContent = 'No se pudo acceder a la cámara. Revisa que ninguna otra app la esté usando e inténtalo de nuevo.';
@@ -920,19 +948,20 @@ function pickBackCameraId(cameras) {
   if (cameras.length === 1) return cameras[0].id;
   const back = cameras.find(c => /back|rear|trasera|environment/i.test(c.label) && !/front|user|frontal/i.test(c.label));
   if (back) return back.id;
-  // iOS Safari often lists the back camera last when labels are unavailable.
+  // The mobile browser often lists the back camera last when labels are unavailable.
   return cameras[cameras.length - 1].id;
 }
 
 function populateCameraSelect(cameras, selectedId) {
   if (cameras.length <= 1) {
-    cameraSelect.classList.remove('show');
+    cameraMenuWrap.classList.remove('show');
+    closeCameraMenu();
     return;
   }
   cameraSelect.innerHTML = cameras.map((c, i) =>
     `<option value="${c.id}" ${c.id === selectedId ? 'selected' : ''}>${c.label || ('Cámara ' + (i+1))}</option>`
   ).join('');
-  cameraSelect.classList.add('show');
+  cameraMenuWrap.classList.add('show');
 }
 
 async function startScanner() {
@@ -945,7 +974,7 @@ async function startScanner() {
   }
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     showPermissionBanner('generic');
-    scanStatus.textContent = 'Este navegador no soporta acceso a cámara. Usa Safari en iOS 15 o superior.';
+    scanStatus.textContent = 'Este navegador no soporta acceso a cámara. Actualiza tu navegador e inténtalo de nuevo.';
     scanStatus.classList.add('err');
     return;
   }
@@ -1027,6 +1056,8 @@ async function stopScanner(silent) {
   scanning = false;
   torchOn = false;
   torchBtn.classList.remove('active', 'show');
+  cameraMenuWrap.classList.remove('show');
+  closeCameraMenu();
   readerWrap.classList.remove('active');
   scanBtn.textContent = 'Iniciar escáner';
   camTag.textContent = 'Cámara detenida';
