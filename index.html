@@ -1148,7 +1148,22 @@ cameraSelect.addEventListener('change', async () => {
   }
 });
 
-function onScanSuccess(decodedText) {
+// 14-digit codes: drop the first digit and the last two, keeping the middle 11.
+// 13-digit codes: drop just the last two, keeping the first 11.
+// Any other length (12 or fewer, or anything not 13/14) is stored exactly as read.
+function normalizeCode(rawCode) {
+  const code = (rawCode || '').trim();
+  if (/^\d{14}$/.test(code)) {
+    return code.slice(1, -2);
+  }
+  if (/^\d{13}$/.test(code)) {
+    return code.slice(0, -2);
+  }
+  return code;
+}
+
+function onScanSuccess(rawDecodedText) {
+  const decodedText = normalizeCode(rawDecodedText);
   if (decodedText === pendingCode) {
     // Same barcode still in view — ignore repeat frames.
     return;
@@ -1200,7 +1215,12 @@ function applyLookup(code) {
 
 codeInput.addEventListener('input', () => {
   lastCodeFromScan = false;
-  pendingCode = codeInput.value.trim();
+  const typed = codeInput.value.trim();
+  const normalized = normalizeCode(typed);
+  if (normalized !== typed) {
+    codeInput.value = normalized; // auto-trim the instant a 13/14-digit code is completed
+  }
+  pendingCode = normalized;
   applyLookup(pendingCode);
   updateCodeReadout(pendingCode);
 });
@@ -1214,14 +1234,15 @@ const totalRowsEl = document.getElementById('total-rows');
 const totalQtyEl = document.getElementById('total-qty');
 
 function commitItem(code, desc, qty, sku) {
-  if (!code || isNaN(qty) || qty <= 0) return;
-  const existing = items.find(it => it.code === code);
+  const normalizedCode = normalizeCode(code);
+  if (!normalizedCode || isNaN(qty) || qty <= 0) return;
+  const existing = items.find(it => it.code === normalizedCode);
   if (existing) {
     existing.qty += qty;
     if (desc) existing.description = desc;
     if (sku) existing.sku = sku;
   } else {
-    items.push({ code, description: desc, sku: sku || '', qty });
+    items.push({ code: normalizedCode, description: desc, sku: sku || '', qty });
   }
 }
 
