@@ -182,11 +182,6 @@
     color:var(--text-dim);
   }
   .tag.on{background:var(--success-soft);border-color:var(--success);color:var(--success);}
-  .toggle-list-row{
-    display:flex;
-    justify-content:flex-end;
-    margin:2px 0 10px;
-  }
   .toggle-list-btn{
     font-family:'JetBrains Mono',monospace;
     font-size:11px;
@@ -682,8 +677,8 @@
   <section>
     <h2>Lista capturada <span class="tag" id="count-tag">0 artículos</span></h2>
     <div class="totals">
-      <span>Renglones: <b id="total-rows">0</b></span>
       <span>Cantidad total: <b id="total-qty">0</b></span>
+      <button class="toggle-list-btn" id="toggle-list-btn" type="button" style="display:none;">Mostrar lista total</button>
     </div>
     <div id="list-wrap">
       <div class="empty-state" id="empty-msg">Aún no hay artículos capturados.</div>
@@ -1264,8 +1259,8 @@ const addBtn = document.getElementById('add-btn');
 const itemsList = document.getElementById('items-list');
 const emptyMsg = document.getElementById('empty-msg');
 const countTag = document.getElementById('count-tag');
-const totalRowsEl = document.getElementById('total-rows');
 const totalQtyEl = document.getElementById('total-qty');
+const toggleListBtn = document.getElementById('toggle-list-btn');
 
 function commitItem(code, desc, qty, sku, productId) {
   if (!code || isNaN(qty) || qty <= 0) return;
@@ -1338,6 +1333,7 @@ function renderItems() {
   if (items.length === 0) {
     itemsList.style.display = 'none';
     emptyMsg.style.display = 'block';
+    toggleListBtn.style.display = 'none';
   } else {
     itemsList.style.display = 'block';
     emptyMsg.style.display = 'none';
@@ -1348,28 +1344,28 @@ function renderItems() {
     const [latestEntry, ...restEntries] = ordered;
 
     let html = buildItemCardHtml(latestEntry.it, latestEntry.idx, true);
+    if (listExpanded && restEntries.length > 0) {
+      html += restEntries.map(({ it, idx }) => buildItemCardHtml(it, idx, false)).join('');
+    }
+    itemsList.innerHTML = html;
 
     if (restEntries.length > 0) {
-      const label = listExpanded ? 'Ocultar lista' : 'Mostrar lista';
-      html += `<div class="toggle-list-row"><button class="toggle-list-btn" id="toggle-list-btn" type="button">${label}</button></div>`;
-      if (listExpanded) {
-        html += restEntries.map(({ it, idx }) => buildItemCardHtml(it, idx, false)).join('');
-      }
+      toggleListBtn.style.display = 'inline-block';
+      toggleListBtn.textContent = listExpanded ? 'Ocultar lista total' : 'Mostrar lista total';
+    } else {
+      toggleListBtn.style.display = 'none';
     }
-
-    itemsList.innerHTML = html;
   }
   countTag.textContent = items.length + ' artículo' + (items.length === 1 ? '' : 's');
-  totalRowsEl.textContent = items.length;
   totalQtyEl.textContent = items.reduce((s,it)=>s+Number(it.qty||0),0);
 }
 
+toggleListBtn.addEventListener('click', () => {
+  listExpanded = !listExpanded;
+  renderItems();
+});
+
 itemsList.addEventListener('click', (e) => {
-  if (e.target.matches('.toggle-list-btn')) {
-    listExpanded = !listExpanded;
-    renderItems();
-    return;
-  }
   if (e.target.matches('.btn-danger-outline')) {
     const idx = Number(e.target.dataset.idx);
     items.splice(idx, 1);
