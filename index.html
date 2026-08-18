@@ -182,6 +182,22 @@
     color:var(--text-dim);
   }
   .tag.on{background:var(--success-soft);border-color:var(--success);color:var(--success);}
+  .toggle-list-row{
+    display:flex;
+    justify-content:flex-end;
+    margin:2px 0 10px;
+  }
+  .toggle-list-btn{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    padding:3px 8px;
+    border-radius:20px;
+    background:rgba(179,136,255,0.14);
+    border:1px solid #B388FF;
+    color:#B388FF;
+    cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+  }
   .qty-add-group{
     display:flex;
     align-items:stretch;
@@ -289,8 +305,8 @@
   }
   .btn-danger-outline{
     background:transparent;
-    border:1px solid #4a2a28;
-    color:#ff8b83;
+    border:1px solid rgba(255,214,10,0.35);
+    color:#FFD60A;
     padding:6px 10px;
     font-size:12px;
   }
@@ -438,10 +454,21 @@
     padding:10px 2px;
     border-bottom:1px solid var(--border);
   }
-  .item-card:last-child{border-bottom:none;}
+  .item-card:last-child:not(.item-card-latest){border-bottom:none;}
+  .item-card-latest{
+    border:1px solid var(--success);
+    border-radius:10px;
+    background:rgba(58,220,132,0.08);
+    padding:8px 8px;
+    margin-bottom:8px;
+  }
+  .item-card-latest .item-code{
+    font-size:16px;
+    color:var(--success);
+  }
   .item-row-top{
     display:grid;
-    grid-template-columns: minmax(0,1fr) 56px auto;
+    grid-template-columns: minmax(0,1fr) 34px auto;
     align-items:center;
     gap:8px;
     width:100%;
@@ -456,16 +483,23 @@
     overflow:hidden;
     text-overflow:ellipsis;
   }
-  .item-qty-edit{
+  .item-row-top input.item-qty-edit{
     width:100%;
+    height:30px;
     box-sizing:border-box;
-    padding:6px 4px;
+    padding:0 2px;
     margin:0;
     font-size:13px;
     text-align:center;
   }
   .item-row-top .btn-danger-outline{
+    height:30px;
+    box-sizing:border-box;
+    padding:0 10px;
     white-space:nowrap;
+    display:flex;
+    align-items:center;
+    justify-content:center;
   }
   .item-row-bottom{
     margin-top:5px;
@@ -480,7 +514,7 @@
     white-space:nowrap;
     overflow:hidden;
     text-overflow:ellipsis;
-    color:var(--text-dim);
+    color:var(--success);
   }
   .item-desc.unknown{
     color:var(--accent);
@@ -489,7 +523,7 @@
   .item-sku{
     font-family:'JetBrains Mono',monospace;
     font-size:12px;
-    color:var(--text-dim);
+    color:var(--success);
     white-space:nowrap;
     overflow:hidden;
     text-overflow:ellipsis;
@@ -497,6 +531,18 @@
     flex:none;
   }
   .item-sku.unknown{
+    color:var(--accent);
+  }
+  .item-row-id{
+    margin-top:3px;
+    font-family:'JetBrains Mono',monospace;
+    font-size:12px;
+    color:var(--success);
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .item-row-id.unknown{
     color:var(--accent);
   }
   .empty-state{
@@ -546,7 +592,7 @@
           <span>Base de datos</span>
           <span class="tag" id="db-tag">No cargada</span>
         </div>
-        <label for="db-file">Archivo opcional (.xlsx / .csv) con columnas de código, descripción y SKU (opcional)</label>
+        <label for="db-file">Archivo opcional (.xlsx / .csv) con columnas de código, descripción, SKU e Id de producto (opcionales)</label>
         <input type="file" id="db-file" accept=".xlsx,.xls,.csv">
         <div class="status-line" id="db-status">Sin base de datos: la descripción se capturará manualmente.</div>
 
@@ -818,19 +864,21 @@ dbFileInput.addEventListener('change', (e) => {
       const rows = XLSX.utils.sheet_to_json(sheet, {header:1, defval:''});
       database = {};
       let count = 0;
-      // Detect header row and code / description / SKU columns
+      // Detect header row and code / description / SKU / product ID columns
       let startRow = 0;
-      let codeCol = 0, descCol = 1, skuCol = -1;
+      let codeCol = 0, descCol = 1, skuCol = -1, idCol = -1;
       if (rows.length > 0) {
         const header = rows[0].map(h => String(h).toLowerCase().trim());
         const cIdx = header.findIndex(h => h.includes('cod') || h.includes('barra'));
         const dIdx = header.findIndex(h => h.includes('desc') || h.includes('nombre') || h.includes('articulo') || h.includes('artículo'));
         const sIdx = header.findIndex(h => h.includes('sku'));
-        if (cIdx !== -1 || dIdx !== -1 || sIdx !== -1) {
+        const iIdx = header.findIndex(h => /\bid\b/.test(h) || h.includes('id_producto') || h.includes('idproducto') || h.includes('product id'));
+        if (cIdx !== -1 || dIdx !== -1 || sIdx !== -1 || iIdx !== -1) {
           startRow = 1;
           if (cIdx !== -1) codeCol = cIdx;
           if (dIdx !== -1) descCol = dIdx;
           if (sIdx !== -1) skuCol = sIdx;
+          if (iIdx !== -1) idCol = iIdx;
         }
       }
       for (let i = startRow; i < rows.length; i++) {
@@ -839,14 +887,16 @@ dbFileInput.addEventListener('change', (e) => {
         const code = String(row[codeCol] ?? '').trim();
         const desc = String(row[descCol] ?? '').trim();
         const sku = skuCol !== -1 ? String(row[skuCol] ?? '').trim() : '';
+        const productId = idCol !== -1 ? String(row[idCol] ?? '').trim() : '';
         if (code) {
-          database[code] = { description: desc, sku: sku };
+          database[code] = { description: desc, sku: sku, productId: productId };
           count++;
         }
       }
       dbTag.textContent = count + ' código(s)';
       dbTag.classList.add('on');
-      dbStatus.textContent = 'Base de datos cargada: ' + count + ' código(s)' + (skuCol !== -1 ? ' con descripción y SKU.' : ' con descripción.');
+      const extras = [skuCol !== -1 ? 'SKU' : null, idCol !== -1 ? 'Id de producto' : null].filter(Boolean);
+      dbStatus.textContent = 'Base de datos cargada: ' + count + ' código(s) con descripción' + (extras.length ? ' y ' + extras.join(' y ') + '.' : '.');
       dbStatus.classList.add('ok');
     } catch (err) {
       dbStatus.textContent = 'No se pudo leer el archivo. Verifica el formato.';
@@ -1148,22 +1198,7 @@ cameraSelect.addEventListener('change', async () => {
   }
 });
 
-// 14-digit codes: drop the first digit and the last two, keeping the middle 11.
-// 13-digit codes: drop just the last two, keeping the first 11.
-// Any other length (12 or fewer, or anything not 13/14) is stored exactly as read.
-function normalizeCode(rawCode) {
-  const code = (rawCode || '').trim();
-  if (/^\d{14}$/.test(code)) {
-    return code.slice(1, -2);
-  }
-  if (/^\d{13}$/.test(code)) {
-    return code.slice(0, -2);
-  }
-  return code;
-}
-
-function onScanSuccess(rawDecodedText) {
-  const decodedText = normalizeCode(rawDecodedText);
+function onScanSuccess(decodedText) {
   if (decodedText === pendingCode) {
     // Same barcode still in view — ignore repeat frames.
     return;
@@ -1172,7 +1207,7 @@ function onScanSuccess(rawDecodedText) {
     // A different code was just scanned: auto-save the previous pending item first.
     const rawQty = parseFloat(qtyInput.value);
     const finalQty = (isNaN(rawQty) || rawQty <= 0) ? 1 : rawQty;
-    commitItem(pendingCode, descInput.value.trim(), finalQty, pendingSku);
+    commitItem(pendingCode, descInput.value.trim(), finalQty, pendingSku, pendingProductId);
     renderItems();
   }
   pendingCode = decodedText;
@@ -1195,6 +1230,7 @@ scanBtn.addEventListener('click', () => {
 });
 
 let pendingSku = ''; // resolved SKU for the code currently loaded in the form
+let pendingProductId = ''; // resolved Product ID for the code currently loaded in the form
 
 function applyLookup(code) {
   const hasDb = database && Object.keys(database).length > 0;
@@ -1203,24 +1239,22 @@ function applyLookup(code) {
     descInput.value = entry.description || '';
     descInput.placeholder = 'Descripción del artículo';
     pendingSku = entry.sku ? entry.sku.trim() : '';
+    pendingProductId = entry.productId ? entry.productId.trim() : '';
   } else if (hasDb && code) {
     descInput.value = 'Producto desconocido';
     pendingSku = '';
+    pendingProductId = '';
   } else {
     descInput.value = '';
     descInput.placeholder = 'Descripción del artículo';
     pendingSku = '';
+    pendingProductId = '';
   }
 }
 
 codeInput.addEventListener('input', () => {
   lastCodeFromScan = false;
-  const typed = codeInput.value.trim();
-  const normalized = normalizeCode(typed);
-  if (normalized !== typed) {
-    codeInput.value = normalized; // auto-trim the instant a 13/14-digit code is completed
-  }
-  pendingCode = normalized;
+  pendingCode = codeInput.value.trim();
   applyLookup(pendingCode);
   updateCodeReadout(pendingCode);
 });
@@ -1233,16 +1267,16 @@ const countTag = document.getElementById('count-tag');
 const totalRowsEl = document.getElementById('total-rows');
 const totalQtyEl = document.getElementById('total-qty');
 
-function commitItem(code, desc, qty, sku) {
-  const normalizedCode = normalizeCode(code);
-  if (!normalizedCode || isNaN(qty) || qty <= 0) return;
-  const existing = items.find(it => it.code === normalizedCode);
+function commitItem(code, desc, qty, sku, productId) {
+  if (!code || isNaN(qty) || qty <= 0) return;
+  const existing = items.find(it => it.code === code);
   if (existing) {
     existing.qty += qty;
     if (desc) existing.description = desc;
     if (sku) existing.sku = sku;
+    if (productId) existing.productId = productId;
   } else {
-    items.push({ code: normalizedCode, description: desc, sku: sku || '', qty });
+    items.push({ code, description: desc, sku: sku || '', productId: productId || '', qty });
   }
 }
 
@@ -1254,7 +1288,7 @@ addBtn.addEventListener('click', () => {
 
   if (!code) { flash(codeInput); return; }
 
-  commitItem(code, desc, finalQty, pendingSku);
+  commitItem(code, desc, finalQty, pendingSku, pendingProductId);
 
   codeInput.value = '';
   descInput.value = '';
@@ -1263,6 +1297,7 @@ addBtn.addEventListener('click', () => {
   updateCodeReadout('');
   pendingCode = '';
   pendingSku = '';
+  pendingProductId = '';
   lastCodeFromScan = false;
 
   if (!scanning) codeInput.focus();
@@ -1275,20 +1310,17 @@ function flash(el){
   setTimeout(()=>{ el.style.borderColor = 'var(--border)'; }, 500);
 }
 
-function renderItems() {
-  if (items.length === 0) {
-    itemsList.style.display = 'none';
-    emptyMsg.style.display = 'block';
-  } else {
-    itemsList.style.display = 'block';
-    emptyMsg.style.display = 'none';
-    itemsList.innerHTML = items.map((it, idx) => {
-      const isUnknown = it.description === 'Producto desconocido';
-      const descText = it.description ? escapeHtml(it.description) : '—';
-      const skuText = it.sku && it.sku.trim() ? escapeHtml(it.sku.trim()) : 'No encontrado';
-      const skuClass = it.sku && it.sku.trim() ? '' : ' unknown';
-      return `
-      <div class="item-card">
+let listExpanded = false; // collapsed by default: only the latest item shows
+
+function buildItemCardHtml(it, idx, isLatest) {
+  const isUnknown = it.description === 'Producto desconocido';
+  const descText = it.description ? escapeHtml(it.description) : '—';
+  const skuText = it.sku && it.sku.trim() ? escapeHtml(it.sku.trim()) : 'No encontrado';
+  const skuClass = it.sku && it.sku.trim() ? '' : ' unknown';
+  const idText = it.productId && it.productId.trim() ? escapeHtml(it.productId.trim()) : 'No encontrado';
+  const idClass = it.productId && it.productId.trim() ? '' : ' unknown';
+  return `
+      <div class="item-card${isLatest ? ' item-card-latest' : ''}">
         <div class="item-row-top">
           <span class="item-code" title="${escapeHtml(it.code)}">${escapeHtml(it.code)}</span>
           <input type="number" min="0" value="${it.qty}" data-idx="${idx}" class="item-qty-edit">
@@ -1298,8 +1330,34 @@ function renderItems() {
           <span class="item-desc${isUnknown ? ' unknown' : ''}" title="${descText}">${descText}</span>
           <span class="item-sku${skuClass}">SKU: ${skuText}</span>
         </div>
+        <div class="item-row-id${idClass}">Id producto: ${idText}</div>
       </div>`;
-    }).join('');
+}
+
+function renderItems() {
+  if (items.length === 0) {
+    itemsList.style.display = 'none';
+    emptyMsg.style.display = 'block';
+  } else {
+    itemsList.style.display = 'block';
+    emptyMsg.style.display = 'none';
+    const latestIdx = items.length - 1;
+    // Newest scanned/entered code first, oldest last — but data-idx always points
+    // to the item's real position in the underlying items array.
+    const ordered = items.map((it, idx) => ({ it, idx })).reverse();
+    const [latestEntry, ...restEntries] = ordered;
+
+    let html = buildItemCardHtml(latestEntry.it, latestEntry.idx, true);
+
+    if (restEntries.length > 0) {
+      const label = listExpanded ? 'Ocultar lista' : 'Mostrar lista';
+      html += `<div class="toggle-list-row"><button class="toggle-list-btn" id="toggle-list-btn" type="button">${label}</button></div>`;
+      if (listExpanded) {
+        html += restEntries.map(({ it, idx }) => buildItemCardHtml(it, idx, false)).join('');
+      }
+    }
+
+    itemsList.innerHTML = html;
   }
   countTag.textContent = items.length + ' artículo' + (items.length === 1 ? '' : 's');
   totalRowsEl.textContent = items.length;
@@ -1307,6 +1365,11 @@ function renderItems() {
 }
 
 itemsList.addEventListener('click', (e) => {
+  if (e.target.matches('.toggle-list-btn')) {
+    listExpanded = !listExpanded;
+    renderItems();
+    return;
+  }
   if (e.target.matches('.btn-danger-outline')) {
     const idx = Number(e.target.dataset.idx);
     items.splice(idx, 1);
@@ -1352,11 +1415,12 @@ document.getElementById('export-btn').addEventListener('click', () => {
   const data = items.map(it => ({
     'Código': it.code,
     'SKU': (it.sku && it.sku.trim()) ? it.sku.trim() : 'No encontrado',
+    'Id de producto': (it.productId && it.productId.trim()) ? it.productId.trim() : 'No encontrado',
     'Descripción': it.description || '',
     'Cantidad': it.qty
   }));
   const ws = XLSX.utils.json_to_sheet(data);
-  ws['!cols'] = [{wch:18},{wch:16},{wch:40},{wch:12}];
+  ws['!cols'] = [{wch:18},{wch:16},{wch:16},{wch:40},{wch:12}];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Inventario');
   const now = new Date();
