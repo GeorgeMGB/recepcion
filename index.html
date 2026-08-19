@@ -54,6 +54,17 @@
     background:rgba(17,19,23,0.92);
     backdrop-filter:blur(8px);
     z-index:20;
+    max-height:200px;
+    overflow:hidden;
+    transition:max-height .25s ease, padding .25s ease, opacity .2s ease, border-color .25s ease;
+  }
+  header.header-hidden{
+    max-height:0;
+    padding-top:0;
+    padding-bottom:0;
+    opacity:0;
+    border-bottom-color:transparent;
+    pointer-events:none;
   }
   .header-row{
     display:flex;
@@ -62,7 +73,7 @@
     gap:12px;
   }
   .header-text{flex:1;min-width:0;}
-  .menu-wrap{position:relative;flex:none;margin-top:2px;}
+  .menu-wrap{position:relative;flex:none;margin-top:37px;}
   .menu-btn{
     width:40px;height:40px;
     background:var(--panel-2);
@@ -129,22 +140,6 @@
     padding:0 2px;
     cursor:pointer;
   }
-  .eyebrow{
-    font-family:'JetBrains Mono',monospace;
-    font-size:11px;
-    letter-spacing:.12em;
-    text-transform:uppercase;
-    color:var(--accent);
-    display:flex;
-    align-items:center;
-    gap:8px;
-  }
-  .eyebrow::before{
-    content:"";
-    width:6px;height:6px;border-radius:50%;
-    background:var(--accent);
-    box-shadow:0 0 0 3px var(--accent-soft);
-  }
   h1{
     font-family:'Space Grotesk',sans-serif;
     font-size:24px;
@@ -182,6 +177,20 @@
     color:var(--text-dim);
   }
   .tag.on{background:var(--success-soft);border-color:var(--success);color:var(--success);}
+  .scan-toggle-btn{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    font-weight:700;
+    padding:4px 10px;
+    border-radius:20px;
+    background:var(--accent);
+    border:1px solid var(--accent);
+    color:#fff;
+    cursor:pointer;
+    white-space:nowrap;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .scan-toggle-btn:disabled{opacity:.5;cursor:default;}
   .toggle-list-btn{
     font-family:'JetBrains Mono',monospace;
     font-size:11px;
@@ -369,13 +378,11 @@
   .permission-banner b{color:var(--accent);}
   .permission-banner ol{margin:6px 0 0;padding-left:18px;}
   .scan-controls{display:flex;align-items:center;gap:8px;}
-  .scan-controls .btn-primary{flex:1;height:46px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;}
   .camera-menu-wrap{
     position:relative;
     flex:none;
-    display:none;
+    display:flex;
   }
-  .camera-menu-wrap.show{display:flex;}
   .btn-icon{
     background:var(--panel-2);
     border:1px solid var(--border);
@@ -571,10 +578,9 @@
 </head>
 <body>
 
-<header>
+<header id="app-header">
   <div class="header-row">
     <div class="header-text">
-      <div class="eyebrow">Lector activo</div>
       <h1>Captura de Inventario</h1>
       <div class="sub">Escanea, teclea cantidad, exporta a Excel.</div>
     </div>
@@ -620,7 +626,7 @@
 <main>
 
   <section>
-    <h2>Escanear artículo <span class="tag" id="cam-tag">Cámara no iniciada</span></h2>
+    <h2>Escanear <button class="scan-toggle-btn" id="scan-btn" type="button">Iniciar escáner</button></h2>
 
     <div class="permission-banner" id="permission-banner">
       <b>Acceso a la cámara bloqueado.</b>
@@ -647,7 +653,6 @@
           <select id="camera-select"></select>
         </div>
       </div>
-      <button class="btn-primary" id="scan-btn" type="button">Iniciar escáner</button>
       <button class="btn-icon" id="torch-btn" type="button" title="Linterna">💡</button>
     </div>
     <div class="status-line" id="scan-status">Toca "Iniciar escáner" y autoriza el uso de la cámara cuando el navegador lo pida.</div>
@@ -906,7 +911,7 @@ const readerWrap = document.getElementById('reader-wrap');
 const scanBtn = document.getElementById('scan-btn');
 const torchBtn = document.getElementById('torch-btn');
 const scanStatus = document.getElementById('scan-status');
-const camTag = document.getElementById('cam-tag');
+const appHeader = document.getElementById('app-header');
 const permissionBanner = document.getElementById('permission-banner');
 const permissionMsg = document.getElementById('permission-msg');
 const permissionSteps = document.getElementById('permission-steps');
@@ -914,6 +919,9 @@ const cameraSelect = document.getElementById('camera-select');
 const cameraMenuWrap = document.getElementById('camera-menu-wrap');
 const cameraMenuBtn = document.getElementById('camera-menu-btn');
 const cameraMenuDropdown = document.getElementById('camera-menu-dropdown');
+
+function hideHeader() { appHeader.classList.add('header-hidden'); }
+function showHeader() { appHeader.classList.remove('header-hidden'); }
 
 cameraMenuBtn.addEventListener('click', (e) => {
   e.stopPropagation();
@@ -998,15 +1006,10 @@ function pickBackCameraId(cameras) {
 }
 
 function populateCameraSelect(cameras, selectedId) {
-  if (cameras.length <= 1) {
-    cameraMenuWrap.classList.remove('show');
-    closeCameraMenu();
-    return;
-  }
+  if (cameras.length <= 1) return;
   cameraSelect.innerHTML = cameras.map((c, i) =>
     `<option value="${c.id}" ${c.id === selectedId ? 'selected' : ''}>${c.label || ('Cámara ' + (i+1))}</option>`
   ).join('');
-  cameraMenuWrap.classList.add('show');
 }
 
 async function startScanner() {
@@ -1026,7 +1029,6 @@ async function startScanner() {
 
   scanStatus.textContent = 'Solicitando permiso de cámara…';
   scanStatus.className = 'status-line';
-  camTag.textContent = 'Solicitando permiso…';
   scanBtn.disabled = true;
 
   // Step 1: explicitly trigger the iOS permission prompt and confirm access
@@ -1036,7 +1038,6 @@ async function startScanner() {
     probeStream.getTracks().forEach(t => t.stop());
   } catch (err) {
     scanBtn.disabled = false;
-    camTag.textContent = 'Sin permiso';
     if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
       showPermissionBanner('denied');
       scanStatus.textContent = 'Permiso denegado.';
@@ -1080,14 +1081,12 @@ async function startScanner() {
     scanning = true;
     scanBtn.disabled = false;
     scanBtn.textContent = 'Detener escáner';
-    camTag.textContent = 'Cámara activa';
-    camTag.classList.add('on');
     scanStatus.textContent = 'Apunta la cámara al código de barras.';
+    hideHeader();
     checkTorchSupport();
   } catch (err) {
     scanBtn.disabled = false;
     readerWrap.classList.remove('active');
-    camTag.textContent = 'Error de cámara';
     showPermissionBanner('generic');
     scanStatus.textContent = 'No se pudo iniciar el video de la cámara. Toca "Iniciar escáner" para reintentar.';
     scanStatus.classList.add('err');
@@ -1101,12 +1100,10 @@ async function stopScanner(silent) {
   scanning = false;
   torchOn = false;
   torchBtn.classList.remove('active', 'show');
-  cameraMenuWrap.classList.remove('show');
   closeCameraMenu();
   readerWrap.classList.remove('active');
   scanBtn.textContent = 'Iniciar escáner';
-  camTag.textContent = 'Cámara detenida';
-  camTag.classList.remove('on');
+  showHeader();
   if (!silent) scanStatus.textContent = 'Escáner detenido.';
 }
 
