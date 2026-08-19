@@ -178,16 +178,21 @@
   }
   .tag.on{background:var(--success-soft);border-color:var(--success);color:var(--success);}
   .scan-toggle-btn{
-    font-family:'JetBrains Mono',monospace;
-    font-size:11px;
-    font-weight:700;
-    padding:4px 10px;
-    border-radius:20px;
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:600;
+    font-size:14px;
+    height:40px;
+    box-sizing:border-box;
+    padding:0 14px;
+    border-radius:8px;
     background:var(--accent);
     border:1px solid var(--accent);
     color:#fff;
     cursor:pointer;
     white-space:nowrap;
+    display:flex;
+    align-items:center;
+    justify-content:center;
     -webkit-tap-highlight-color:transparent;
   }
   .scan-toggle-btn:disabled{opacity:.5;cursor:default;}
@@ -196,9 +201,9 @@
     font-size:11px;
     padding:3px 8px;
     border-radius:20px;
-    background:rgba(179,136,255,0.14);
-    border:1px solid #B388FF;
-    color:#B388FF;
+    background:var(--success-soft);
+    border:1px solid var(--success);
+    color:var(--success);
     cursor:pointer;
     -webkit-tap-highlight-color:transparent;
   }
@@ -590,7 +595,7 @@
     </div>
     <div class="menu-wrap">
       <button class="menu-btn" id="menu-btn" type="button" aria-label="Abrir menú" aria-expanded="false">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/><path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/></svg>
+        <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><rect x="2" y="4" width="2" height="16"/><rect x="5" y="4" width="1" height="16"/><rect x="7.5" y="4" width="2" height="16"/><rect x="11" y="4" width="1" height="16"/><rect x="13" y="4" width="3" height="16"/><rect x="17.5" y="4" width="1" height="16"/><rect x="19.5" y="4" width="2.5" height="16"/></svg>
       </button>
       <div class="menu-dropdown" id="menu-dropdown">
         <div class="menu-dropdown-header">
@@ -1323,10 +1328,11 @@ function buildItemCardHtml(it, idx, isLatest) {
   const skuClass = it.sku && it.sku.trim() ? '' : ' unknown';
   const idText = it.productId && it.productId.trim() ? escapeHtml(it.productId.trim()) : 'No encontrado';
   const idClass = it.productId && it.productId.trim() ? '' : ' unknown';
+  const codeText = escapeHtml(it.code);
   return `
       <div class="item-card${isLatest ? ' item-card-latest' : ''}">
         <div class="item-row-top">
-          <span class="item-code" title="${escapeHtml(it.code)}">${escapeHtml(it.code)}</span>
+          <span class="item-code${idClass}" title="${idText}">${idText}</span>
           <input type="number" min="0" value="${it.qty}" data-idx="${idx}" class="item-qty-edit">
           <button class="btn-danger-outline" data-idx="${idx}">Quitar</button>
         </div>
@@ -1334,7 +1340,7 @@ function buildItemCardHtml(it, idx, isLatest) {
           <span class="item-desc${isUnknown ? ' unknown' : ''}" title="${descText}">${descText}</span>
           <span class="item-sku${skuClass}">SKU: ${skuText}</span>
         </div>
-        <div class="item-row-id${idClass}">Id producto: ${idText}</div>
+        <div class="item-row-id" title="${codeText}">Código: ${codeText}</div>
       </div>`;
 }
 
