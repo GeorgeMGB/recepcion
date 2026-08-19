@@ -55,7 +55,6 @@
     backdrop-filter:blur(8px);
     z-index:20;
     max-height:200px;
-    overflow:hidden;
     transition:max-height .25s ease, padding .25s ease, opacity .2s ease, border-color .25s ease;
   }
   header.header-hidden{
@@ -63,17 +62,18 @@
     padding-top:0;
     padding-bottom:0;
     opacity:0;
+    overflow:hidden;
     border-bottom-color:transparent;
     pointer-events:none;
   }
   .header-row{
     display:flex;
-    align-items:flex-start;
+    align-items:center;
     justify-content:space-between;
     gap:12px;
   }
   .header-text{flex:1;min-width:0;}
-  .menu-wrap{position:relative;flex:none;margin-top:37px;}
+  .menu-wrap{position:relative;flex:none;}
   .menu-btn{
     width:40px;height:40px;
     background:var(--panel-2);
@@ -377,7 +377,7 @@
   .permission-banner.show{display:block;}
   .permission-banner b{color:var(--accent);}
   .permission-banner ol{margin:6px 0 0;padding-left:18px;}
-  .scan-controls{display:flex;align-items:center;gap:8px;}
+  .scan-header-controls{display:flex;align-items:center;gap:6px;flex:none;}
   .camera-menu-wrap{
     position:relative;
     flex:none;
@@ -387,14 +387,15 @@
     background:var(--panel-2);
     border:1px solid var(--border);
     color:var(--text);
-    width:48px;
-    height:46px;
+    width:40px;
+    height:40px;
     box-sizing:border-box;
+    border-radius:8px;
     flex:none;
     display:none;
     align-items:center;
     justify-content:center;
-    font-size:18px;
+    font-size:16px;
   }
   .btn-icon.show{display:flex;}
   .btn-icon.active{background:var(--accent);border-color:var(--accent);}
@@ -574,6 +575,9 @@
     flex-direction:column;
     gap:8px;
   }
+  @media (display-mode: standalone), (display-mode: fullscreen), (display-mode: minimal-ui) {
+    header{ padding-top: 26px; } /* 22px + 20% */
+  }
 </style>
 </head>
 <body>
@@ -626,7 +630,20 @@
 <main>
 
   <section>
-    <h2>Escanear <button class="scan-toggle-btn" id="scan-btn" type="button">Iniciar escáner</button></h2>
+    <h2>
+      <span>Escanear</span>
+      <span class="scan-header-controls">
+        <div class="camera-menu-wrap" id="camera-menu-wrap">
+          <button class="menu-btn" id="camera-menu-btn" type="button" aria-label="Seleccionar cámara" aria-expanded="false">📷</button>
+          <div class="menu-dropdown menu-dropdown-left" id="camera-menu-dropdown">
+            <div class="menu-dropdown-header"><span>Cámara</span></div>
+            <select id="camera-select"></select>
+          </div>
+        </div>
+        <button class="btn-icon" id="torch-btn" type="button" title="Linterna">💡</button>
+        <button class="scan-toggle-btn" id="scan-btn" type="button">Iniciar escáner</button>
+      </span>
+    </h2>
 
     <div class="permission-banner" id="permission-banner">
       <b>Acceso a la cámara bloqueado.</b>
@@ -645,16 +662,6 @@
       <div class="scan-line"></div>
     </div>
 
-    <div class="scan-controls">
-      <div class="camera-menu-wrap" id="camera-menu-wrap">
-        <button class="menu-btn" id="camera-menu-btn" type="button" aria-label="Seleccionar cámara" aria-expanded="false">📷</button>
-        <div class="menu-dropdown menu-dropdown-left" id="camera-menu-dropdown">
-          <div class="menu-dropdown-header"><span>Cámara</span></div>
-          <select id="camera-select"></select>
-        </div>
-      </div>
-      <button class="btn-icon" id="torch-btn" type="button" title="Linterna">💡</button>
-    </div>
     <div class="status-line" id="scan-status">Toca "Iniciar escáner" y autoriza el uso de la cámara cuando el navegador lo pida.</div>
   </section>
 
@@ -1058,7 +1065,12 @@ async function startScanner() {
   } catch (err) {
     availableCameras = [];
   }
-  chosenCameraId = pickBackCameraId(availableCameras);
+  // Only auto-pick the back camera the first time. If the user already chose a
+  // specific camera from the dropdown, keep respecting that choice on restart.
+  const stillAvailable = chosenCameraId && availableCameras.some(c => c.id === chosenCameraId);
+  if (!stillAvailable) {
+    chosenCameraId = pickBackCameraId(availableCameras);
+  }
   populateCameraSelect(availableCameras, chosenCameraId);
 
   readerWrap.classList.add('active');
