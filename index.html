@@ -46,6 +46,10 @@
     background-image:repeating-linear-gradient(90deg,var(--border) 0 2px,transparent 2px 5px, var(--border) 5px 6px, transparent 6px 11px, var(--border) 11px 13px, transparent 13px 18px);
     opacity:.55;
     margin:0;
+    transition:height .25s ease;
+  }
+  .barcode-rule.barcode-rule-expanded{
+    height:39px; /* 14px + 280% */
   }
   header{
     padding:22px 20px 16px;
@@ -68,7 +72,7 @@
   }
   .header-row{
     display:flex;
-    align-items:center;
+    align-items:flex-end;
     justify-content:space-between;
     gap:12px;
   }
@@ -81,6 +85,7 @@
     border-radius:8px;
     color:var(--text-dim);
     display:flex;align-items:center;justify-content:center;
+    overflow:hidden;
     cursor:pointer;
     -webkit-tap-highlight-color:transparent;
   }
@@ -581,7 +586,7 @@
     gap:8px;
   }
   @media (display-mode: standalone), (display-mode: fullscreen), (display-mode: minimal-ui) {
-    header{ padding-top: 26px; } /* 22px + 20% */
+    header{ padding-top: 31px; } /* 22px + 40% */
   }
 </style>
 </head>
@@ -595,7 +600,7 @@
     </div>
     <div class="menu-wrap">
       <button class="menu-btn" id="menu-btn" type="button" aria-label="Abrir menú" aria-expanded="false">
-        <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><rect x="2" y="4" width="2" height="16"/><rect x="5" y="4" width="1" height="16"/><rect x="7.5" y="4" width="2" height="16"/><rect x="11" y="4" width="1" height="16"/><rect x="13" y="4" width="3" height="16"/><rect x="17.5" y="4" width="1" height="16"/><rect x="19.5" y="4" width="2.5" height="16"/></svg>
+        <svg viewBox="0 0 24 24" fill="currentColor" width="40" height="40"><rect x="2" y="4" width="2" height="16"/><rect x="5" y="4" width="1" height="16"/><rect x="7.5" y="4" width="2" height="16"/><rect x="11" y="4" width="1" height="16"/><rect x="13" y="4" width="3" height="16"/><rect x="17.5" y="4" width="1" height="16"/><rect x="19.5" y="4" width="2.5" height="16"/></svg>
       </button>
       <div class="menu-dropdown" id="menu-dropdown">
         <div class="menu-dropdown-header">
@@ -630,7 +635,7 @@
   <button class="btn-primary" id="chrome-install-btn" style="width:auto;padding:8px 12px;font-size:12.5px;flex:none;">Instalar</button>
   <button class="close-x" id="chrome-install-close" aria-label="Cerrar">✕</button>
 </div>
-<div class="barcode-rule"></div>
+<div class="barcode-rule" id="top-barcode-rule"></div>
 
 <main>
 
@@ -932,8 +937,15 @@ const cameraMenuWrap = document.getElementById('camera-menu-wrap');
 const cameraMenuBtn = document.getElementById('camera-menu-btn');
 const cameraMenuDropdown = document.getElementById('camera-menu-dropdown');
 
-function hideHeader() { appHeader.classList.add('header-hidden'); }
-function showHeader() { appHeader.classList.remove('header-hidden'); }
+const topBarcodeRule = document.getElementById('top-barcode-rule');
+function hideHeader() {
+  appHeader.classList.add('header-hidden');
+  topBarcodeRule.classList.add('barcode-rule-expanded');
+}
+function showHeader() {
+  appHeader.classList.remove('header-hidden');
+  topBarcodeRule.classList.remove('barcode-rule-expanded');
+}
 
 cameraMenuBtn.addEventListener('click', (e) => {
   e.stopPropagation();
@@ -1097,7 +1109,7 @@ async function startScanner() {
     );
     scanning = true;
     scanBtn.disabled = false;
-    scanBtn.textContent = 'Detener escáner';
+    scanBtn.textContent = 'Detener';
     scanStatus.textContent = 'Apunta la cámara al código de barras.';
     hideHeader();
     checkTorchSupport();
