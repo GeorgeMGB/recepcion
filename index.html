@@ -164,6 +164,13 @@
   .section-escanear{
     padding-bottom:8px; /* 16px -> 50% */
   }
+  .section-articulo{
+    padding-top:14px;
+    padding-bottom:9px; /* rebalanced so the red box sits centered in the freed space */
+  }
+  .section-articulo h2{
+    margin-bottom:10px;
+  }
   section h2{
     font-family:'Space Grotesk',sans-serif;
     font-size:14px;
@@ -425,11 +432,11 @@
   }
   .code-readout{
     width:95%;
-    margin:0 auto 16px;
+    margin:0 auto 0;
     background:#000;
     border:2px solid var(--accent);
     border-radius:12px;
-    padding:6px 10px 14px;
+    padding:5px 10px 13px;
     text-align:center;
     box-shadow:0 0 0 4px rgba(255,68,56,0.08), inset 0 0 24px rgba(255,68,56,0.06);
   }
@@ -589,7 +596,7 @@
     gap:8px;
   }
   @media (display-mode: standalone), (display-mode: fullscreen), (display-mode: minimal-ui) {
-    header{ padding-top: 35px; } /* 22px + 60% */
+    header{ padding-top: 44px; } /* 22px + 100% */
   }
 </style>
 </head>
@@ -603,7 +610,7 @@
     </div>
     <div class="menu-wrap">
       <button class="menu-btn" id="menu-btn" type="button" aria-label="Abrir menú" aria-expanded="false">
-        <svg viewBox="0 0 24 24" fill="currentColor" width="120" height="120"><rect x="2" y="4" width="2" height="16"/><rect x="5" y="4" width="1" height="16"/><rect x="7.5" y="4" width="2" height="16"/><rect x="11" y="4" width="1" height="16"/><rect x="13" y="4" width="3" height="16"/><rect x="17.5" y="4" width="1" height="16"/><rect x="19.5" y="4" width="2.5" height="16"/></svg>
+        <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><rect x="2" y="4" width="2" height="16"/><rect x="5" y="4" width="1" height="16"/><rect x="7.5" y="4" width="2" height="16"/><rect x="11" y="4" width="1" height="16"/><rect x="13" y="4" width="3" height="16"/><rect x="17.5" y="4" width="1" height="16"/><rect x="19.5" y="4" width="2.5" height="16"/></svg>
       </button>
       <div class="menu-dropdown" id="menu-dropdown">
         <div class="menu-dropdown-header">
@@ -678,7 +685,7 @@
     <div class="status-line" id="scan-status">Toca "Iniciar escáner" y autoriza el uso de la cámara cuando el navegador lo pida.</div>
   </section>
 
-  <section>
+  <section class="section-articulo">
     <h2 class="h2-with-qty">
       <span>Artículo</span>
       <span class="qty-add-group">
@@ -950,13 +957,34 @@ function showHeader() {
   topBarcodeRule.classList.remove('barcode-rule-expanded');
 }
 
+function positionCameraDropdown() {
+  const margin = 12;
+  const btnRect = cameraMenuBtn.getBoundingClientRect();
+  cameraMenuDropdown.style.position = 'fixed';
+  cameraMenuDropdown.style.top = (btnRect.bottom + 8) + 'px';
+  cameraMenuDropdown.style.right = 'auto';
+  // Measure natural width first (left unconstrained), then clamp into the viewport.
+  cameraMenuDropdown.style.left = margin + 'px';
+  const ddWidth = cameraMenuDropdown.offsetWidth;
+  let left = btnRect.left;
+  const maxLeft = window.innerWidth - margin - ddWidth;
+  if (left > maxLeft) left = maxLeft;
+  if (left < margin) left = margin;
+  cameraMenuDropdown.style.left = left + 'px';
+}
+
 cameraMenuBtn.addEventListener('click', (e) => {
   e.stopPropagation();
   const willOpen = !cameraMenuDropdown.classList.contains('show');
   cameraMenuDropdown.classList.toggle('show', willOpen);
   cameraMenuBtn.classList.toggle('active', willOpen);
   cameraMenuBtn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+  if (willOpen) positionCameraDropdown();
 });
+window.addEventListener('resize', () => {
+  if (cameraMenuDropdown.classList.contains('show')) positionCameraDropdown();
+});
+
 cameraMenuDropdown.addEventListener('click', (e) => e.stopPropagation());
 function closeCameraMenu() {
   cameraMenuDropdown.classList.remove('show');
