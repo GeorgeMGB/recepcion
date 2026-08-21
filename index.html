@@ -57,10 +57,22 @@
     right:0;
     bottom:0;
     width:100%;
-    height:100px;
+    height:120px;
     background-image:repeating-linear-gradient(90deg,var(--border) 0 2px,transparent 2px 5px, var(--border) 5px 6px, transparent 6px 11px, var(--border) 11px 13px, transparent 13px 18px);
     background-color:var(--bg);
     opacity:.55;
+    pointer-events:none;
+    z-index:-1;
+  }
+  .footer-datetime{
+    position:fixed;
+    left:0;
+    right:0;
+    bottom:14px;
+    text-align:center;
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    color:var(--text-dim);
     pointer-events:none;
     z-index:-1;
   }
@@ -178,11 +190,11 @@
     padding-bottom:8px; /* 16px -> 50% */
   }
   .section-articulo{
-    padding-top:14px;
-    padding-bottom:11px;
+    padding-top:19px;
+    padding-bottom:18px;
   }
   .section-articulo h2{
-    margin-bottom:11px;
+    margin-bottom:19px;
   }
   section h2{
     font-family:'Space Grotesk',sans-serif;
@@ -1514,7 +1526,19 @@ document.getElementById('export-btn').addEventListener('click', () => {
 });
 
 renderItems();
+
+// ---------- Footer date/time (basic, decorative, sits over the bottom barcode strip) ----------
+const footerDatetime = document.getElementById('footer-datetime');
+function updateFooterDatetime() {
+  const now = new Date();
+  const datePart = now.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const timePart = now.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  footerDatetime.textContent = datePart + '  ·  ' + timePart;
+}
+updateFooterDatetime();
+setInterval(updateFooterDatetime, 1000);
 </script>
 <div class="barcode-rule-bottom"></div>
+<div class="footer-datetime" id="footer-datetime"></div>
 </body>
 </html>
