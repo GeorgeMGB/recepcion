@@ -39,7 +39,7 @@
     color:var(--text);
     font-family:'Inter',sans-serif;
     -webkit-font-smoothing:antialiased;
-    padding-bottom:24px;
+    padding-bottom:140px;
   }
   .barcode-rule{
     height:14px;
@@ -50,6 +50,19 @@
   }
   .barcode-rule.barcode-rule-expanded{
     height:49px; /* 14px + 350% */
+  }
+  .barcode-rule-bottom{
+    position:fixed;
+    left:0;
+    right:0;
+    bottom:0;
+    width:100%;
+    height:100px;
+    background-image:repeating-linear-gradient(90deg,var(--border) 0 2px,transparent 2px 5px, var(--border) 5px 6px, transparent 6px 11px, var(--border) 11px 13px, transparent 13px 18px);
+    background-color:var(--bg);
+    opacity:.55;
+    pointer-events:none;
+    z-index:-1;
   }
   header{
     padding:22px 20px 16px;
@@ -169,7 +182,7 @@
     padding-bottom:11px;
   }
   .section-articulo h2{
-    margin-bottom:8px;
+    margin-bottom:11px;
   }
   section h2{
     font-family:'Space Grotesk',sans-serif;
@@ -532,8 +545,9 @@
     font-size:13px;
   }
   .item-desc{
-    max-width:50%;
-    flex:0 1 auto;
+    max-width:100%;
+    width:100%;
+    flex:1 1 100%;
     white-space:nowrap;
     overflow:hidden;
     text-overflow:ellipsis;
@@ -558,15 +572,19 @@
   }
   .item-row-id{
     margin-top:3px;
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:8px;
     font-family:'JetBrains Mono',monospace;
     font-size:12px;
     color:var(--success);
+  }
+  .item-row-id > span:first-child{
     white-space:nowrap;
     overflow:hidden;
     text-overflow:ellipsis;
-  }
-  .item-row-id.unknown{
-    color:var(--accent);
+    min-width:0;
   }
   .empty-state{
     text-align:center;
@@ -617,7 +635,7 @@
           <span>Base de datos</span>
           <span class="tag" id="db-tag">No cargada</span>
         </div>
-        <label for="db-file">Archivo opcional (.xlsx / .csv) con columnas de código, descripción, SKU e Id de producto (opcionales)</label>
+        <label for="db-file">Archivo opcional (.xlsx / .csv) con columnas de código, descripción, SKU, Id de producto y EAN producto (opcionales)</label>
         <input type="file" id="db-file" accept=".xlsx,.xls,.csv">
         <div class="status-line" id="db-status">Sin base de datos: la descripción se capturará manualmente.</div>
 
@@ -837,7 +855,8 @@ window.addEventListener('scroll', () => {
 })();
 
 // ---------- State ----------
-let database = {};      // code -> { description, sku }
+let database = {};      // code -> { description, sku, productId, ean }
+let databaseByEan = {}; // ean -> same entry object, for fallback lookups
 let items = [];         // {code, description, qty}
 
 // ---------- Confirm before an intentional reload/close when there's unsaved data ----------
@@ -890,22 +909,25 @@ dbFileInput.addEventListener('change', (e) => {
       const sheet = wb.Sheets[wb.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(sheet, {header:1, defval:''});
       database = {};
+      databaseByEan = {};
       let count = 0;
-      // Detect header row and code / description / SKU / product ID columns
+      // Detect header row and code / description / SKU / product ID / EAN columns
       let startRow = 0;
-      let codeCol = 0, descCol = 1, skuCol = -1, idCol = -1;
+      let codeCol = 0, descCol = 1, skuCol = -1, idCol = -1, eanCol = -1;
       if (rows.length > 0) {
         const header = rows[0].map(h => String(h).toLowerCase().trim());
         const cIdx = header.findIndex(h => h.includes('cod') || h.includes('barra'));
         const dIdx = header.findIndex(h => h.includes('desc') || h.includes('nombre') || h.includes('articulo') || h.includes('artículo'));
         const sIdx = header.findIndex(h => h.includes('sku'));
         const iIdx = header.findIndex(h => /\bid\b/.test(h) || h.includes('id_producto') || h.includes('idproducto') || h.includes('product id'));
-        if (cIdx !== -1 || dIdx !== -1 || sIdx !== -1 || iIdx !== -1) {
+        const eIdx = header.findIndex(h => h.includes('ean'));
+        if (cIdx !== -1 || dIdx !== -1 || sIdx !== -1 || iIdx !== -1 || eIdx !== -1) {
           startRow = 1;
           if (cIdx !== -1) codeCol = cIdx;
           if (dIdx !== -1) descCol = dIdx;
           if (sIdx !== -1) skuCol = sIdx;
           if (iIdx !== -1) idCol = iIdx;
+          if (eIdx !== -1) eanCol = eIdx;
         }
       }
       for (let i = startRow; i < rows.length; i++) {
@@ -915,14 +937,19 @@ dbFileInput.addEventListener('change', (e) => {
         const desc = String(row[descCol] ?? '').trim();
         const sku = skuCol !== -1 ? String(row[skuCol] ?? '').trim() : '';
         const productId = idCol !== -1 ? String(row[idCol] ?? '').trim() : '';
+        const ean = eanCol !== -1 ? String(row[eanCol] ?? '').trim() : '';
         if (code) {
-          database[code] = { description: desc, sku: sku, productId: productId };
+          const entry = { description: desc, sku: sku, productId: productId, ean: ean };
+          database[code] = entry;
+          // Also index by EAN so a scan that matches the EAN column (but not the
+          // main Código column) still resolves to the same product info.
+          if (ean) databaseByEan[ean] = entry;
           count++;
         }
       }
       dbTag.textContent = count + ' código(s)';
       dbTag.classList.add('on');
-      const extras = [skuCol !== -1 ? 'SKU' : null, idCol !== -1 ? 'Id de producto' : null].filter(Boolean);
+      const extras = [skuCol !== -1 ? 'SKU' : null, idCol !== -1 ? 'Id de producto' : null, eanCol !== -1 ? 'EAN' : null].filter(Boolean);
       dbStatus.textContent = 'Base de datos cargada: ' + count + ' código(s) con descripción' + (extras.length ? ' y ' + extras.join(' y ') + '.' : '.');
       dbStatus.classList.add('ok');
     } catch (err) {
@@ -1286,7 +1313,8 @@ let pendingProductId = ''; // resolved Product ID for the code currently loaded 
 
 function applyLookup(code) {
   const hasDb = database && Object.keys(database).length > 0;
-  const entry = database[code];
+  // Primary match against the Código column; if not found, try the EAN producto column.
+  const entry = database[code] || databaseByEan[code];
   if (entry) {
     descInput.value = entry.description || '';
     descInput.placeholder = 'Descripción del artículo';
@@ -1381,9 +1409,11 @@ function buildItemCardHtml(it, idx, isLatest) {
         </div>
         <div class="item-row-bottom">
           <span class="item-desc${isUnknown ? ' unknown' : ''}" title="${descText}">${descText}</span>
+        </div>
+        <div class="item-row-id">
+          <span title="${codeText}">Cód: ${codeText}</span>
           <span class="item-sku${skuClass}">SKU: ${skuText}</span>
         </div>
-        <div class="item-row-id" title="${codeText}">Código: ${codeText}</div>
       </div>`;
 }
 
@@ -1485,5 +1515,6 @@ document.getElementById('export-btn').addEventListener('click', () => {
 
 renderItems();
 </script>
+<div class="barcode-rule-bottom"></div>
 </body>
 </html>
