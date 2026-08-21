@@ -39,7 +39,7 @@
     color:var(--text);
     font-family:'Inter',sans-serif;
     -webkit-font-smoothing:antialiased;
-    padding-bottom:140px;
+    padding-bottom:145px;
   }
   .barcode-rule{
     height:14px;
@@ -57,7 +57,7 @@
     right:0;
     bottom:0;
     width:100%;
-    height:120px;
+    height:125px;
     background-image:repeating-linear-gradient(90deg,var(--border) 0 2px,transparent 2px 5px, var(--border) 5px 6px, transparent 6px 11px, var(--border) 11px 13px, transparent 13px 18px);
     background-color:var(--bg);
     opacity:.55;
@@ -749,6 +749,9 @@
   </section>
 
 </main>
+
+<div class="barcode-rule-bottom"></div>
+<div class="footer-datetime" id="footer-datetime"></div>
 
 <script>
 // ---------- Add-to-Home-Screen: iOS ----------
@@ -1538,7 +1541,5 @@ function updateFooterDatetime() {
 updateFooterDatetime();
 setInterval(updateFooterDatetime, 1000);
 </script>
-<div class="barcode-rule-bottom"></div>
-<div class="footer-datetime" id="footer-datetime"></div>
 </body>
 </html>
