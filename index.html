@@ -647,7 +647,7 @@
           <span>Base de datos</span>
           <span class="tag" id="db-tag">No cargada</span>
         </div>
-        <label for="db-file">Archivo opcional (.xlsx / .csv) con columnas de código, descripción, SKU, Id de producto y EAN producto (opcionales)</label>
+        <label for="db-file">Archivo opcional (.xlsx / .csv) con columnas de código, descripción, SKU, Id de producto, EAN producto y Modelo (opcionales)</label>
         <input type="file" id="db-file" accept=".xlsx,.xls,.csv">
         <div class="status-line" id="db-status">Sin base de datos: la descripción se capturará manualmente.</div>
 
@@ -870,8 +870,9 @@ window.addEventListener('scroll', () => {
 })();
 
 // ---------- State ----------
-let database = {};      // code -> { description, sku, productId, ean }
+let database = {};      // code -> { description, sku, productId, ean, modelo }
 let databaseByEan = {}; // ean -> same entry object, for fallback lookups
+let databaseByModelo = {}; // modelo -> same entry object, for third-level fallback lookups
 let items = [];         // {code, description, qty}
 
 // ---------- Confirm before an intentional reload/close when there's unsaved data ----------
@@ -925,10 +926,11 @@ dbFileInput.addEventListener('change', (e) => {
       const rows = XLSX.utils.sheet_to_json(sheet, {header:1, defval:''});
       database = {};
       databaseByEan = {};
+      databaseByModelo = {};
       let count = 0;
-      // Detect header row and code / description / SKU / product ID / EAN columns
+      // Detect header row and code / description / SKU / product ID / EAN / Modelo columns
       let startRow = 0;
-      let codeCol = 0, descCol = 1, skuCol = -1, idCol = -1, eanCol = -1;
+      let codeCol = 0, descCol = 1, skuCol = -1, idCol = -1, eanCol = -1, modeloCol = -1;
       if (rows.length > 0) {
         const header = rows[0].map(h => String(h).toLowerCase().trim());
         const cIdx = header.findIndex(h => h.includes('cod') || h.includes('barra'));
@@ -936,13 +938,15 @@ dbFileInput.addEventListener('change', (e) => {
         const sIdx = header.findIndex(h => h.includes('sku'));
         const iIdx = header.findIndex(h => /\bid\b/.test(h) || h.includes('id_producto') || h.includes('idproducto') || h.includes('product id'));
         const eIdx = header.findIndex(h => h.includes('ean'));
-        if (cIdx !== -1 || dIdx !== -1 || sIdx !== -1 || iIdx !== -1 || eIdx !== -1) {
+        const mIdx = header.findIndex(h => h.includes('modelo') || h.includes('model'));
+        if (cIdx !== -1 || dIdx !== -1 || sIdx !== -1 || iIdx !== -1 || eIdx !== -1 || mIdx !== -1) {
           startRow = 1;
           if (cIdx !== -1) codeCol = cIdx;
           if (dIdx !== -1) descCol = dIdx;
           if (sIdx !== -1) skuCol = sIdx;
           if (iIdx !== -1) idCol = iIdx;
           if (eIdx !== -1) eanCol = eIdx;
+          if (mIdx !== -1) modeloCol = mIdx;
         }
       }
       for (let i = startRow; i < rows.length; i++) {
@@ -953,18 +957,20 @@ dbFileInput.addEventListener('change', (e) => {
         const sku = skuCol !== -1 ? String(row[skuCol] ?? '').trim() : '';
         const productId = idCol !== -1 ? String(row[idCol] ?? '').trim() : '';
         const ean = eanCol !== -1 ? String(row[eanCol] ?? '').trim() : '';
+        const modelo = modeloCol !== -1 ? String(row[modeloCol] ?? '').trim() : '';
         if (code) {
-          const entry = { description: desc, sku: sku, productId: productId, ean: ean };
+          const entry = { description: desc, sku: sku, productId: productId, ean: ean, modelo: modelo };
           database[code] = entry;
-          // Also index by EAN so a scan that matches the EAN column (but not the
-          // main Código column) still resolves to the same product info.
+          // Also index by EAN and Modelo so a scan that matches those columns
+          // (but not the main Código column) still resolves to the same product info.
           if (ean) databaseByEan[ean] = entry;
+          if (modelo) databaseByModelo[modelo] = entry;
           count++;
         }
       }
       dbTag.textContent = count + ' código(s)';
       dbTag.classList.add('on');
-      const extras = [skuCol !== -1 ? 'SKU' : null, idCol !== -1 ? 'Id de producto' : null, eanCol !== -1 ? 'EAN' : null].filter(Boolean);
+      const extras = [skuCol !== -1 ? 'SKU' : null, idCol !== -1 ? 'Id de producto' : null, eanCol !== -1 ? 'EAN' : null, modeloCol !== -1 ? 'Modelo' : null].filter(Boolean);
       dbStatus.textContent = 'Base de datos cargada: ' + count + ' código(s) con descripción' + (extras.length ? ' y ' + extras.join(' y ') + '.' : '.');
       dbStatus.classList.add('ok');
     } catch (err) {
@@ -1328,8 +1334,8 @@ let pendingProductId = ''; // resolved Product ID for the code currently loaded 
 
 function applyLookup(code) {
   const hasDb = database && Object.keys(database).length > 0;
-  // Primary match against the Código column; if not found, try the EAN producto column.
-  const entry = database[code] || databaseByEan[code];
+  // Primary match against the Código column; if not found, try EAN producto, then Modelo.
+  const entry = database[code] || databaseByEan[code] || databaseByModelo[code];
   if (entry) {
     descInput.value = entry.description || '';
     descInput.placeholder = 'Descripción del artículo';
