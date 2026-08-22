@@ -873,6 +873,7 @@ window.addEventListener('scroll', () => {
 let database = {};      // code -> { description, sku, productId, ean, modelo }
 let databaseByEan = {}; // ean -> same entry object, for fallback lookups
 let databaseByModelo = {}; // modelo -> same entry object, for third-level fallback lookups
+let databaseByProductId = {}; // productId -> same entry object, for fourth-level fallback lookups
 let items = [];         // {code, description, qty}
 
 // ---------- Confirm before an intentional reload/close when there's unsaved data ----------
@@ -927,14 +928,17 @@ dbFileInput.addEventListener('change', (e) => {
       database = {};
       databaseByEan = {};
       databaseByModelo = {};
+      databaseByProductId = {};
       let count = 0;
       // Detect header row and code / description / SKU / product ID / EAN / Modelo columns
       let startRow = 0;
       let codeCol = 0, descCol = 1, skuCol = -1, idCol = -1, eanCol = -1, modeloCol = -1;
       if (rows.length > 0) {
-        const header = rows[0].map(h => String(h).toLowerCase().trim());
+        // Strip accents before matching keywords: without this, "Código" (with tilde)
+        // silently fails to match 'cod', breaking column detection for accented headers.
+        const header = rows[0].map(h => String(h).toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
         const cIdx = header.findIndex(h => h.includes('cod') || h.includes('barra'));
-        const dIdx = header.findIndex(h => h.includes('desc') || h.includes('nombre') || h.includes('articulo') || h.includes('artículo'));
+        const dIdx = header.findIndex(h => h.includes('desc') || h.includes('nombre') || h.includes('articulo'));
         const sIdx = header.findIndex(h => h.includes('sku'));
         const iIdx = header.findIndex(h => /\bid\b/.test(h) || h.includes('id_producto') || h.includes('idproducto') || h.includes('product id'));
         const eIdx = header.findIndex(h => h.includes('ean'));
@@ -961,10 +965,11 @@ dbFileInput.addEventListener('change', (e) => {
         if (code) {
           const entry = { description: desc, sku: sku, productId: productId, ean: ean, modelo: modelo };
           database[code] = entry;
-          // Also index by EAN and Modelo so a scan that matches those columns
-          // (but not the main Código column) still resolves to the same product info.
+          // Also index by EAN, Modelo, and Id de producto so a scan that matches any of
+          // those columns (but not the main Código column) still resolves to the same info.
           if (ean) databaseByEan[ean] = entry;
           if (modelo) databaseByModelo[modelo] = entry;
+          if (productId) databaseByProductId[productId] = entry;
           count++;
         }
       }
@@ -1334,8 +1339,8 @@ let pendingProductId = ''; // resolved Product ID for the code currently loaded 
 
 function applyLookup(code) {
   const hasDb = database && Object.keys(database).length > 0;
-  // Primary match against the Código column; if not found, try EAN producto, then Modelo.
-  const entry = database[code] || databaseByEan[code] || databaseByModelo[code];
+  // Primary match against the Código column; if not found, try EAN producto, then Modelo, then Id de producto.
+  const entry = database[code] || databaseByEan[code] || databaseByModelo[code] || databaseByProductId[code];
   if (entry) {
     descInput.value = entry.description || '';
     descInput.placeholder = 'Descripción del artículo';
