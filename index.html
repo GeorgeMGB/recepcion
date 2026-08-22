@@ -371,6 +371,7 @@
     max-height:17vh;
   }
   #reader-wrap.active{display:block;}
+  #reader-wrap.scan-locked{opacity:.4;}
   #reader{width:100%;height:100%;}
   #reader video{
     width:100% !important;
@@ -930,9 +931,9 @@ dbFileInput.addEventListener('change', (e) => {
       databaseByModelo = {};
       databaseByProductId = {};
       let count = 0;
-      // Detect header row and code / description / SKU / product ID / EAN / Modelo columns
+      // Detect header row and code / description / SKU / product ID / EAN / Modelo / Und columns
       let startRow = 0;
-      let codeCol = 0, descCol = 1, skuCol = -1, idCol = -1, eanCol = -1, modeloCol = -1;
+      let codeCol = 0, descCol = 1, skuCol = -1, idCol = -1, eanCol = -1, modeloCol = -1, undCol = -1;
       if (rows.length > 0) {
         // Strip accents before matching keywords: without this, "Código" (with tilde)
         // silently fails to match 'cod', breaking column detection for accented headers.
@@ -943,7 +944,8 @@ dbFileInput.addEventListener('change', (e) => {
         const iIdx = header.findIndex(h => /\bid\b/.test(h) || h.includes('id_producto') || h.includes('idproducto') || h.includes('product id'));
         const eIdx = header.findIndex(h => h.includes('ean'));
         const mIdx = header.findIndex(h => h.includes('modelo') || h.includes('model'));
-        if (cIdx !== -1 || dIdx !== -1 || sIdx !== -1 || iIdx !== -1 || eIdx !== -1 || mIdx !== -1) {
+        const uIdx = header.findIndex(h => /\bund\b/.test(h) || h.includes('unidad') || h.includes('unid'));
+        if (cIdx !== -1 || dIdx !== -1 || sIdx !== -1 || iIdx !== -1 || eIdx !== -1 || mIdx !== -1 || uIdx !== -1) {
           startRow = 1;
           if (cIdx !== -1) codeCol = cIdx;
           if (dIdx !== -1) descCol = dIdx;
@@ -951,6 +953,7 @@ dbFileInput.addEventListener('change', (e) => {
           if (iIdx !== -1) idCol = iIdx;
           if (eIdx !== -1) eanCol = eIdx;
           if (mIdx !== -1) modeloCol = mIdx;
+          if (uIdx !== -1) undCol = uIdx;
         }
       }
       for (let i = startRow; i < rows.length; i++) {
@@ -962,8 +965,9 @@ dbFileInput.addEventListener('change', (e) => {
         const productId = idCol !== -1 ? String(row[idCol] ?? '').trim() : '';
         const ean = eanCol !== -1 ? String(row[eanCol] ?? '').trim() : '';
         const modelo = modeloCol !== -1 ? String(row[modeloCol] ?? '').trim() : '';
+        const und = undCol !== -1 ? String(row[undCol] ?? '').trim() : '';
         if (code) {
-          const entry = { description: desc, sku: sku, productId: productId, ean: ean, modelo: modelo };
+          const entry = { description: desc, sku: sku, productId: productId, ean: ean, modelo: modelo, und: und };
           database[code] = entry;
           // Also index by EAN, Modelo, and Id de producto so a scan that matches any of
           // those columns (but not the main Código column) still resolves to the same info.
@@ -975,7 +979,7 @@ dbFileInput.addEventListener('change', (e) => {
       }
       dbTag.textContent = count + ' código(s)';
       dbTag.classList.add('on');
-      const extras = [skuCol !== -1 ? 'SKU' : null, idCol !== -1 ? 'Id de producto' : null, eanCol !== -1 ? 'EAN' : null, modeloCol !== -1 ? 'Modelo' : null].filter(Boolean);
+      const extras = [skuCol !== -1 ? 'SKU' : null, idCol !== -1 ? 'Id de producto' : null, eanCol !== -1 ? 'EAN' : null, modeloCol !== -1 ? 'Modelo' : null, undCol !== -1 ? 'Und' : null].filter(Boolean);
       dbStatus.textContent = 'Base de datos cargada: ' + count + ' código(s) con descripción' + (extras.length ? ' y ' + extras.join(' y ') + '.' : '.');
       dbStatus.classList.add('ok');
     } catch (err) {
@@ -1050,16 +1054,18 @@ const codeInput = document.getElementById('code-input');
 const descInput = document.getElementById('desc-input');
 const qtyInput = document.getElementById('qty-input');
 
-// The default "1" is just a starting suggestion: it clears the instant you tap in,
-// and only comes back (to actually count toward the record) if you leave it untouched.
+// The pre-filled quantity (default "1", or the Und-based value from the database) is
+// just a starting suggestion: it clears the instant you tap in, and only comes back
+// (to actually count toward the record) if you leave the field untouched/empty.
+let suggestedQty = '1';
 qtyInput.addEventListener('focus', () => {
-  if (qtyInput.value === '1') {
+  if (qtyInput.value === suggestedQty) {
     qtyInput.value = '';
   }
 });
 qtyInput.addEventListener('blur', () => {
   if (qtyInput.value.trim() === '') {
-    qtyInput.value = '1';
+    qtyInput.value = suggestedQty;
   }
 });
 
@@ -1281,8 +1287,34 @@ function updateCodeReadout(code) {
 }
 updateCodeReadout('');
 
-let lastCodeFromScan = false;
 let pendingCode = ''; // code currently loaded in the form, awaiting confirmation/save
+
+// If the scanned/typed code is exactly 14 digits, look it up by the Código column
+// only and pre-fill the quantity from its "Und" column. Otherwise default to 1.
+function applyAutoQuantity(code) {
+  if (/^\d{14}$/.test(code)) {
+    const entry = database[code];
+    const und = entry ? parseFloat(entry.und) : NaN;
+    suggestedQty = (!isNaN(und) && und > 0) ? String(und) : '1';
+  } else {
+    suggestedQty = '1';
+  }
+  qtyInput.value = suggestedQty;
+}
+
+// Scanning is only allowed while the Código field is empty. Once a code is
+// captured, the scanner is locked (further reads are ignored) until "Agregar"
+// is pressed, to avoid misreads from overlapping/incomplete/misaligned codes.
+function updateScanLockUI() {
+  const locked = codeInput.value.trim().length > 0;
+  readerWrap.classList.toggle('scan-locked', locked);
+  if (locked) {
+    scanStatus.textContent = 'Código capturado. Presiona "Agregar" para escanear el siguiente.';
+  } else if (scanning) {
+    scanStatus.textContent = 'Apunta la cámara al código de barras.';
+    scanStatus.classList.remove('err');
+  }
+}
 
 torchBtn.addEventListener('click', async () => {
   if (!scanning || !html5QrCode) return;
@@ -1304,29 +1336,20 @@ cameraSelect.addEventListener('change', async () => {
 });
 
 function onScanSuccess(decodedText) {
-  if (decodedText === pendingCode) {
-    // Same barcode still in view — ignore repeat frames.
-    return;
-  }
-  if (pendingCode) {
-    // A different code was just scanned: auto-save the previous pending item first.
-    const rawQty = parseFloat(qtyInput.value);
-    const finalQty = (isNaN(rawQty) || rawQty <= 0) ? 1 : rawQty;
-    commitItem(pendingCode, descInput.value.trim(), finalQty, pendingSku, pendingProductId);
-    renderItems();
-  }
+  // Ignore further reads while a code is already pending confirmation.
+  if (codeInput.value.trim().length > 0) return;
+
   pendingCode = decodedText;
   codeInput.value = decodedText;
   applyLookup(decodedText);
   updateCodeReadout(decodedText);
-  qtyInput.value = '1';
-  lastCodeFromScan = true;
+  applyAutoQuantity(decodedText);
   playBeep();
   scanStatus.textContent = 'Código leído: ' + decodedText;
   scanStatus.classList.add('ok');
   qtyInput.focus();
   if (navigator.vibrate) navigator.vibrate(60);
-  // The camera keeps running continuously so the next item can be scanned right away.
+  updateScanLockUI();
 }
 
 scanBtn.addEventListener('click', () => {
@@ -1359,10 +1382,11 @@ function applyLookup(code) {
 }
 
 codeInput.addEventListener('input', () => {
-  lastCodeFromScan = false;
   pendingCode = codeInput.value.trim();
   applyLookup(pendingCode);
   updateCodeReadout(pendingCode);
+  applyAutoQuantity(pendingCode);
+  updateScanLockUI();
 });
 
 // ---------- Add item ----------
@@ -1386,6 +1410,8 @@ function commitItem(code, desc, qty, sku, productId) {
   }
 }
 
+// Adding a record is only ever done by pressing "Agregar" — there is no
+// automatic/implicit save path anywhere else in the app.
 addBtn.addEventListener('click', () => {
   const code = codeInput.value.trim();
   const desc = descInput.value.trim();
@@ -1404,8 +1430,8 @@ addBtn.addEventListener('click', () => {
   pendingCode = '';
   pendingSku = '';
   pendingProductId = '';
-  lastCodeFromScan = false;
 
+  updateScanLockUI(); // code field is empty again: scanning unlocks
   if (!scanning) codeInput.focus();
 
   renderItems();
