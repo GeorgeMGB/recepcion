@@ -34,6 +34,11 @@
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;overscroll-behavior-y:contain;}
+  html.page-scroll-locked, html.page-scroll-locked body{
+    overflow:hidden;
+    height:100%;
+    overscroll-behavior:none;
+  }
   body{
     background:var(--bg);
     color:var(--text);
@@ -75,6 +80,31 @@
     color:var(--text-dim);
     pointer-events:none;
     z-index:-1;
+  }
+  .list-summary-footer{
+    display:none;
+    position:fixed;
+    left:0;
+    right:0;
+    bottom:38px;
+    flex-direction:column;
+    align-items:center;
+    gap:8px;
+    padding:10px 16px 12px;
+    z-index:15;
+  }
+  .list-summary-footer.show{display:flex;}
+  .list-summary-footer-totals{
+    display:flex;
+    justify-content:center;
+    gap:16px;
+    font-family:'JetBrains Mono',monospace;
+    font-size:12px;
+    color:var(--text-dim);
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:20px;
+    padding:6px 14px;
   }
   header{
     padding:22px 20px 16px;
@@ -517,7 +547,7 @@
   }
   .item-row-top{
     display:grid;
-    grid-template-columns: minmax(0,1fr) 34px auto;
+    grid-template-columns: minmax(0,1fr) 52px auto;
     align-items:center;
     gap:8px;
     width:100%;
@@ -540,6 +570,14 @@
     margin:0;
     font-size:13px;
     text-align:center;
+  }
+  .item-row-top input.item-qty-edit::-webkit-outer-spin-button,
+  .item-row-top input.item-qty-edit::-webkit-inner-spin-button{
+    -webkit-appearance:none;
+    margin:0;
+  }
+  .item-row-top input.item-qty-edit{
+    -moz-appearance:textfield;
   }
   .item-row-top .btn-danger-outline{
     height:30px;
@@ -753,6 +791,13 @@
 
 <div class="barcode-rule-bottom"></div>
 <div class="footer-datetime" id="footer-datetime"></div>
+<div class="list-summary-footer" id="list-summary-footer">
+  <button class="toggle-list-btn" id="footer-toggle-list-btn" type="button">Ocultar lista total</button>
+  <div class="list-summary-footer-totals">
+    <span id="footer-count-tag">0 artículos</span>
+    <span id="footer-total-qty">Cantidad total: 0</span>
+  </div>
+</div>
 
 <script>
 // ---------- Add-to-Home-Screen: iOS ----------
@@ -1396,6 +1441,28 @@ const emptyMsg = document.getElementById('empty-msg');
 const countTag = document.getElementById('count-tag');
 const totalQtyEl = document.getElementById('total-qty');
 const toggleListBtn = document.getElementById('toggle-list-btn');
+const listSummaryFooter = document.getElementById('list-summary-footer');
+const footerToggleListBtn = document.getElementById('footer-toggle-list-btn');
+const footerCountTag = document.getElementById('footer-count-tag');
+const footerTotalQty = document.getElementById('footer-total-qty');
+
+// Shows a sticky bottom summary (count + total qty + a quick collapse button) only
+// once there are more than 6 captured items AND the full list is currently expanded —
+// otherwise the plain date/time footer remains the only thing visible down there.
+function updateListSummaryFooter() {
+  const shouldShow = items.length > 6 && listExpanded;
+  listSummaryFooter.classList.toggle('show', shouldShow);
+  if (shouldShow) {
+    footerCountTag.textContent = countTag.textContent;
+    footerTotalQty.textContent = 'Cantidad total: ' + totalQtyEl.textContent;
+  }
+}
+
+footerToggleListBtn.addEventListener('click', () => {
+  listExpanded = !listExpanded;
+  updatePageScrollLock();
+  renderItems();
+});
 
 function commitItem(code, desc, qty, sku, productId) {
   if (!code || isNaN(qty) || qty <= 0) return;
@@ -1444,6 +1511,13 @@ function flash(el){
 
 let listExpanded = false; // collapsed by default: only the latest item shows
 
+// The page stays fixed (no scroll) at all times, except while the full captured
+// list is expanded — that's the only state where content can exceed one screen.
+function updatePageScrollLock() {
+  document.documentElement.classList.toggle('page-scroll-locked', !listExpanded);
+}
+updatePageScrollLock();
+
 function buildItemCardHtml(it, idx, isLatest) {
   const isUnknown = it.description === 'Producto desconocido';
   const descText = it.description ? escapeHtml(it.description) : '—';
@@ -1488,6 +1562,7 @@ function renderItems() {
       html += restEntries.map(({ it, idx }) => buildItemCardHtml(it, idx, false)).join('');
     }
     itemsList.innerHTML = html;
+    fitLatestCodeText();
 
     if (restEntries.length > 0) {
       toggleListBtn.style.display = 'inline-block';
@@ -1498,10 +1573,26 @@ function renderItems() {
   }
   countTag.textContent = items.length + ' artículo' + (items.length === 1 ? '' : 's');
   totalQtyEl.textContent = items.reduce((s,it)=>s+Number(it.qty||0),0);
+  updateListSummaryFooter();
+}
+
+// Keeps the latest card's Id de producto at its normal 32px size, and only shrinks
+// it (down to a 14px floor) if the text is too long to fit its space — never the
+// other way around, so short IDs always stay full-size.
+function fitLatestCodeText() {
+  const el = itemsList.querySelector('.item-card-latest .item-code');
+  if (!el) return;
+  el.style.fontSize = '';
+  let size = 32;
+  while (el.scrollWidth > el.clientWidth && size > 14) {
+    size -= 1;
+    el.style.fontSize = size + 'px';
+  }
 }
 
 toggleListBtn.addEventListener('click', () => {
   listExpanded = !listExpanded;
+  updatePageScrollLock();
   renderItems();
 });
 
