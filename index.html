@@ -62,38 +62,70 @@
     right:0;
     bottom:0;
     width:100%;
-    height:125px;
+    height:calc(125px + env(safe-area-inset-bottom));
     background-image:repeating-linear-gradient(90deg,var(--border) 0 2px,transparent 2px 5px, var(--border) 5px 6px, transparent 6px 11px, var(--border) 11px 13px, transparent 13px 18px);
     background-color:var(--bg);
     opacity:.55;
     pointer-events:none;
     z-index:-1;
   }
+  .barcode-rule-bottom.footer-elevated{ z-index:14; }
+  .footer-datetime.footer-elevated{ z-index:14; }
   .footer-datetime{
     position:fixed;
     left:0;
     right:0;
-    bottom:14px;
+    bottom:calc(6px + env(safe-area-inset-bottom));
     text-align:center;
     font-family:'JetBrains Mono',monospace;
     font-size:11px;
     color:var(--text-dim);
     pointer-events:none;
-    z-index:-1;
+    z-index:5;
+    transition:bottom .2s ease;
+  }
+  .footer-datetime.with-summary{
+    bottom:calc(20px + env(safe-area-inset-bottom));
   }
   .list-summary-footer{
     display:none;
     position:fixed;
     left:0;
     right:0;
-    bottom:38px;
+    bottom:calc(20px + env(safe-area-inset-bottom));
+    padding:10px 0 12px;
+    background:rgba(17,19,23,0.88);
+    backdrop-filter:blur(6px);
+    z-index:15;
+  }
+  .list-summary-footer.show{display:block;}
+  .list-summary-footer-inner{
+    max-width:640px;
+    margin:0 auto;
+    padding:0 32px;
+    box-sizing:border-box;
+    display:flex;
     flex-direction:column;
     align-items:center;
     gap:8px;
-    padding:10px 16px 12px;
-    z-index:15;
   }
-  .list-summary-footer.show{display:flex;}
+  .list-summary-footer-button-row{
+    width:100%;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+  }
+  .footer-camera-indicator{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    font-weight:700;
+    color:var(--accent);
+    opacity:0;
+    transition:opacity .15s ease;
+    white-space:nowrap;
+  }
+  .footer-camera-indicator.show{opacity:1;}
   .list-summary-footer-totals{
     display:flex;
     justify-content:center;
@@ -307,7 +339,7 @@
   }
   .h2-with-qty .qty-inline input{
     width:100%;
-    min-width:0;
+    min-width:60px;
     max-width:100%;
     height:40px;
     margin:0;
@@ -760,7 +792,7 @@
       <span class="qty-add-group">
         <span class="qty-inline">
           <label for="qty-input">Cant.</label>
-          <input type="number" id="qty-input" inputmode="decimal" placeholder="1" min="0" value="1">
+          <input type="number" id="qty-input" inputmode="decimal" placeholder="0" min="0" value="0">
         </span>
         <button class="btn-success" id="add-btn" type="button">Agregar</button>
       </span>
@@ -789,13 +821,18 @@
 
 </main>
 
-<div class="barcode-rule-bottom"></div>
+<div class="barcode-rule-bottom" id="bottom-barcode-rule"></div>
 <div class="footer-datetime" id="footer-datetime"></div>
 <div class="list-summary-footer" id="list-summary-footer">
-  <button class="toggle-list-btn" id="footer-toggle-list-btn" type="button">Ocultar lista total</button>
-  <div class="list-summary-footer-totals">
-    <span id="footer-count-tag">0 artículos</span>
-    <span id="footer-total-qty">Cantidad total: 0</span>
+  <div class="list-summary-footer-inner">
+    <div class="list-summary-footer-button-row">
+      <span class="footer-camera-indicator" id="footer-camera-indicator">● Cámara activa</span>
+      <button class="toggle-list-btn" id="footer-toggle-list-btn" type="button">Ocultar lista total</button>
+    </div>
+    <div class="list-summary-footer-totals">
+      <span id="footer-count-tag">0 artículos</span>
+      <span id="footer-total-qty">Cantidad total: 0</span>
+    </div>
   </div>
 </div>
 
@@ -1102,7 +1139,7 @@ const qtyInput = document.getElementById('qty-input');
 // The pre-filled quantity (default "1", or the Und-based value from the database) is
 // just a starting suggestion: it clears the instant you tap in, and only comes back
 // (to actually count toward the record) if you leave the field untouched/empty.
-let suggestedQty = '1';
+let suggestedQty = '0';
 qtyInput.addEventListener('focus', () => {
   if (qtyInput.value === suggestedQty) {
     qtyInput.value = '';
@@ -1248,6 +1285,7 @@ async function startScanner() {
     scanStatus.textContent = 'Apunta la cámara al código de barras.';
     hideHeader();
     checkTorchSupport();
+    syncFooterCameraIndicator();
   } catch (err) {
     scanBtn.disabled = false;
     readerWrap.classList.remove('active');
@@ -1268,6 +1306,7 @@ async function stopScanner(silent) {
   readerWrap.classList.remove('active');
   scanBtn.textContent = 'Iniciar escáner';
   showHeader();
+  syncFooterCameraIndicator();
   if (!silent) scanStatus.textContent = 'Escáner detenido.';
 }
 
@@ -1337,7 +1376,9 @@ let pendingCode = ''; // code currently loaded in the form, awaiting confirmatio
 // If the scanned/typed code is exactly 14 digits, look it up by the Código column
 // only and pre-fill the quantity from its "Und" column. Otherwise default to 1.
 function applyAutoQuantity(code) {
-  if (/^\d{14}$/.test(code)) {
+  if (!code) {
+    suggestedQty = '0';
+  } else if (/^\d{14}$/.test(code)) {
     const entry = database[code];
     const und = entry ? parseFloat(entry.und) : NaN;
     suggestedQty = (!isNaN(und) && und > 0) ? String(und) : '1';
@@ -1446,15 +1487,25 @@ const footerToggleListBtn = document.getElementById('footer-toggle-list-btn');
 const footerCountTag = document.getElementById('footer-count-tag');
 const footerTotalQty = document.getElementById('footer-total-qty');
 
+const footerCameraIndicator = document.getElementById('footer-camera-indicator');
+function syncFooterCameraIndicator() {
+  footerCameraIndicator.textContent = scanning ? '● Cámara activa' : '○ Cámara inactiva';
+}
+
 // Shows a sticky bottom summary (count + total qty + a quick collapse button) only
 // once there are more than 6 captured items AND the full list is currently expanded —
 // otherwise the plain date/time footer remains the only thing visible down there.
 function updateListSummaryFooter() {
   const shouldShow = items.length > 6 && listExpanded;
   listSummaryFooter.classList.toggle('show', shouldShow);
+  footerDatetimeEl.classList.toggle('with-summary', shouldShow);
   if (shouldShow) {
     footerCountTag.textContent = countTag.textContent;
     footerTotalQty.textContent = 'Cantidad total: ' + totalQtyEl.textContent;
+    syncFooterCameraIndicator();
+    footerCameraIndicator.classList.add('show');
+  } else {
+    footerCameraIndicator.classList.remove('show');
   }
 }
 
@@ -1492,7 +1543,7 @@ addBtn.addEventListener('click', () => {
   codeInput.value = '';
   descInput.value = '';
   descInput.placeholder = 'Descripción del artículo';
-  qtyInput.value = '1';
+  applyAutoQuantity('');
   updateCodeReadout('');
   pendingCode = '';
   pendingSku = '';
@@ -1513,8 +1564,12 @@ let listExpanded = false; // collapsed by default: only the latest item shows
 
 // The page stays fixed (no scroll) at all times, except while the full captured
 // list is expanded — that's the only state where content can exceed one screen.
+const bottomBarcodeRule = document.getElementById('bottom-barcode-rule');
+const footerDatetimeEl = document.getElementById('footer-datetime');
 function updatePageScrollLock() {
   document.documentElement.classList.toggle('page-scroll-locked', !listExpanded);
+  bottomBarcodeRule.classList.toggle('footer-elevated', listExpanded);
+  footerDatetimeEl.classList.toggle('footer-elevated', listExpanded);
 }
 updatePageScrollLock();
 
