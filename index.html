@@ -44,7 +44,10 @@
     color:var(--text);
     font-family:'Inter',sans-serif;
     -webkit-font-smoothing:antialiased;
-    padding-bottom:145px;
+    padding-bottom:30px;
+  }
+  body.list-scroll-active{
+    padding-bottom:230px;
   }
   .barcode-rule{
     height:14px;
@@ -121,11 +124,8 @@
     font-size:11px;
     font-weight:700;
     color:var(--accent);
-    opacity:0;
-    transition:opacity .15s ease;
     white-space:nowrap;
   }
-  .footer-camera-indicator.show{opacity:1;}
   .list-summary-footer-totals{
     display:flex;
     justify-content:center;
@@ -1492,20 +1492,30 @@ function syncFooterCameraIndicator() {
   footerCameraIndicator.textContent = scanning ? '● Cámara activa' : '○ Cámara inactiva';
 }
 
+// The summary footer (button + totals) should only appear once the user has
+// scrolled far enough that the "Artículo" frame is no longer on screen.
+let articuloSectionVisible = true;
+const articuloSectionEl = document.querySelector('.section-articulo');
+if ('IntersectionObserver' in window && articuloSectionEl) {
+  const articuloObserver = new IntersectionObserver((entries) => {
+    articuloSectionVisible = entries[0].isIntersecting;
+    updateListSummaryFooter();
+  }, { threshold: 0 });
+  articuloObserver.observe(articuloSectionEl);
+}
+
 // Shows a sticky bottom summary (count + total qty + a quick collapse button) only
-// once there are more than 6 captured items AND the full list is currently expanded —
-// otherwise the plain date/time footer remains the only thing visible down there.
+// once there are more than 6 captured items, the full list is expanded, AND the
+// Artículo frame has scrolled out of view — otherwise the plain date/time footer
+// remains the only thing visible down there.
 function updateListSummaryFooter() {
-  const shouldShow = items.length > 6 && listExpanded;
+  const shouldShow = items.length > 6 && listExpanded && !articuloSectionVisible;
   listSummaryFooter.classList.toggle('show', shouldShow);
   footerDatetimeEl.classList.toggle('with-summary', shouldShow);
   if (shouldShow) {
     footerCountTag.textContent = countTag.textContent;
     footerTotalQty.textContent = 'Cantidad total: ' + totalQtyEl.textContent;
     syncFooterCameraIndicator();
-    footerCameraIndicator.classList.add('show');
-  } else {
-    footerCameraIndicator.classList.remove('show');
   }
 }
 
@@ -1568,6 +1578,7 @@ const bottomBarcodeRule = document.getElementById('bottom-barcode-rule');
 const footerDatetimeEl = document.getElementById('footer-datetime');
 function updatePageScrollLock() {
   document.documentElement.classList.toggle('page-scroll-locked', !listExpanded);
+  document.body.classList.toggle('list-scroll-active', listExpanded);
   bottomBarcodeRule.classList.toggle('footer-elevated', listExpanded);
   footerDatetimeEl.classList.toggle('footer-elevated', listExpanded);
 }
