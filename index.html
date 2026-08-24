@@ -65,46 +65,38 @@
     right:0;
     bottom:0;
     width:100%;
-    height:125px;
-    height:calc(125px + env(safe-area-inset-bottom, 0px));
+    height:90px;
+    height:calc(90px + env(safe-area-inset-bottom, 0px));
     background:var(--bg);
     opacity:1;
     pointer-events:none;
-    z-index:-2;
+    z-index:12;
   }
-  .footer-backdrop.footer-elevated{ z-index:13; }
   .barcode-rule-bottom{
     position:fixed;
     left:0;
     right:0;
     bottom:0;
     width:100%;
-    height:125px;
-    height:calc(125px + env(safe-area-inset-bottom, 0px));
+    height:90px;
+    height:calc(90px + env(safe-area-inset-bottom, 0px));
     background-image:repeating-linear-gradient(90deg,var(--border) 0 2px,transparent 2px 5px, var(--border) 5px 6px, transparent 6px 11px, var(--border) 11px 13px, transparent 13px 18px);
     opacity:.55;
     pointer-events:none;
-    z-index:-1;
+    z-index:13;
   }
-  .barcode-rule-bottom.footer-elevated{ z-index:14; }
-  .footer-datetime.footer-elevated{ z-index:16; }
   .footer-datetime{
     position:fixed;
     left:0;
     right:0;
-    bottom:6px;
-    bottom:calc(6px + env(safe-area-inset-bottom, 0px));
+    bottom:20px;
+    bottom:calc(20px + env(safe-area-inset-bottom, 0px));
     text-align:center;
     font-family:'JetBrains Mono',monospace;
     font-size:11px;
     color:var(--text-dim);
     pointer-events:none;
-    z-index:5;
-    transition:bottom .2s ease;
-  }
-  .footer-datetime.with-summary{
-    bottom:20px;
-    bottom:calc(20px + env(safe-area-inset-bottom, 0px));
+    z-index:16;
   }
   .list-summary-footer{
     display:none;
@@ -114,8 +106,6 @@
     bottom:20px;
     bottom:calc(20px + env(safe-area-inset-bottom, 0px));
     padding:10px 0 12px;
-    background:rgba(17,19,23,0.88);
-    backdrop-filter:blur(6px);
     z-index:15;
   }
   .list-summary-footer.show{display:block;}
@@ -1305,6 +1295,7 @@ async function startScanner() {
     hideHeader();
     checkTorchSupport();
     syncFooterCameraIndicator();
+    updateListSummaryFooter();
   } catch (err) {
     scanBtn.disabled = false;
     readerWrap.classList.remove('active');
@@ -1326,6 +1317,7 @@ async function stopScanner(silent) {
   scanBtn.textContent = 'Iniciar escáner';
   showHeader();
   syncFooterCameraIndicator();
+  updateListSummaryFooter();
   if (!silent) scanStatus.textContent = 'Escáner detenido.';
 }
 
@@ -1528,10 +1520,16 @@ if ('IntersectionObserver' in window && articuloSectionEl) {
 // once there are more than 6 captured items, the full list is expanded, AND the
 // Artículo frame has scrolled out of view — otherwise the plain date/time footer
 // remains the only thing visible down there.
+let currentScrollY = 0;
+window.addEventListener('scroll', () => {
+  currentScrollY = window.scrollY || window.pageYOffset || 0;
+  updateListSummaryFooter();
+}, { passive: true });
+
 function updateListSummaryFooter() {
-  const shouldShow = items.length > 6 && listExpanded && !articuloSectionVisible;
+  const scrollThreshold = scanning ? 100 : 40;
+  const shouldShow = items.length > 6 && listExpanded && !articuloSectionVisible && currentScrollY > scrollThreshold;
   listSummaryFooter.classList.toggle('show', shouldShow);
-  footerDatetimeEl.classList.toggle('with-summary', shouldShow);
   if (shouldShow) {
     footerCountTag.textContent = countTag.textContent;
     footerTotalQty.textContent = 'Cantidad total: ' + totalQtyEl.textContent;
@@ -1600,9 +1598,6 @@ const footerBackdrop = document.getElementById('footer-backdrop');
 function updatePageScrollLock() {
   document.documentElement.classList.toggle('page-scroll-locked', !listExpanded);
   document.body.classList.toggle('list-scroll-active', listExpanded);
-  footerBackdrop.classList.toggle('footer-elevated', listExpanded);
-  bottomBarcodeRule.classList.toggle('footer-elevated', listExpanded);
-  footerDatetimeEl.classList.toggle('footer-elevated', listExpanded);
 }
 updatePageScrollLock();
 
