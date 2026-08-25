@@ -65,8 +65,8 @@
     right:0;
     bottom:0;
     width:100%;
-    height:90px;
-    height:calc(90px + env(safe-area-inset-bottom, 0px));
+    height:80px;
+    height:calc(80px + env(safe-area-inset-bottom, 0px));
     background:var(--bg);
     opacity:1;
     pointer-events:none;
@@ -78,8 +78,8 @@
     right:0;
     bottom:0;
     width:100%;
-    height:90px;
-    height:calc(90px + env(safe-area-inset-bottom, 0px));
+    height:80px;
+    height:calc(80px + env(safe-area-inset-bottom, 0px));
     background-image:repeating-linear-gradient(90deg,var(--border) 0 2px,transparent 2px 5px, var(--border) 5px 6px, transparent 6px 11px, var(--border) 11px 13px, transparent 13px 18px);
     opacity:.55;
     pointer-events:none;
@@ -89,14 +89,17 @@
     position:fixed;
     left:0;
     right:0;
-    bottom:20px;
-    bottom:calc(20px + env(safe-area-inset-bottom, 0px));
+    bottom:0;
     text-align:center;
     font-family:'JetBrains Mono',monospace;
     font-size:11px;
     color:var(--text-dim);
     pointer-events:none;
     z-index:16;
+  }
+  .footer-datetime.expanded-spacing{
+    bottom:10px;
+    bottom:calc(10px + env(safe-area-inset-bottom, 0px));
   }
   .list-summary-footer{
     display:none;
@@ -105,7 +108,7 @@
     right:0;
     bottom:20px;
     bottom:calc(20px + env(safe-area-inset-bottom, 0px));
-    padding:10px 0 12px;
+    padding:10px 0 6px;
     z-index:15;
   }
   .list-summary-footer.show{display:block;}
@@ -117,7 +120,7 @@
     display:flex;
     flex-direction:column;
     align-items:center;
-    gap:8px;
+    gap:0;
   }
   .list-summary-footer-button-row{
     width:100%;
@@ -1598,6 +1601,7 @@ const footerBackdrop = document.getElementById('footer-backdrop');
 function updatePageScrollLock() {
   document.documentElement.classList.toggle('page-scroll-locked', !listExpanded);
   document.body.classList.toggle('list-scroll-active', listExpanded);
+  footerDatetimeEl.classList.toggle('expanded-spacing', listExpanded);
 }
 updatePageScrollLock();
 
