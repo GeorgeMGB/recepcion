@@ -100,8 +100,9 @@
     font-size:11px;
     color:var(--text-dim);
     pointer-events:none;
-    z-index:16;
+    z-index:-1;
   }
+  .footer-datetime.footer-elevated{ z-index:16; }
   .footer-datetime.hidden-for-list{
     display:none;
   }
@@ -114,7 +115,7 @@
     margin:0;
     height:80px;
     height:calc(80px + env(safe-area-inset-bottom, 0px));
-    padding:10px 0 3px;
+    padding:10px 0 1px;
     box-sizing:border-box;
     align-items:center;
     justify-content:center;
@@ -137,6 +138,7 @@
     align-items:center;
     justify-content:space-between;
     gap:10px;
+    margin-bottom:8px;
   }
   .footer-camera-indicator{
     font-family:'JetBrains Mono',monospace;
@@ -259,7 +261,7 @@
     font-weight:700;
     letter-spacing:-0.01em;
   }
-  .sub{color:var(--text-dim);font-size:13px;}
+  .sub{color:var(--text-dim);font-size:13px;white-space:nowrap;overflow:hidden;}
   main{padding:16px 16px 0;max-width:640px;margin:0 auto;}
   section{
     background:var(--panel);
@@ -697,6 +699,8 @@
     padding:28px 10px;
     color:var(--text-dim);
     font-size:13px;
+    white-space:nowrap;
+    overflow:hidden;
   }
   .totals{
     display:flex;
@@ -1543,9 +1547,12 @@ window.addEventListener('scroll', () => {
 
 function updateListSummaryFooter() {
   const scrollThreshold = scanning ? 100 : 40;
-  const shouldShow = items.length > 6 && listExpanded && !articuloSectionVisible && currentScrollY > scrollThreshold;
-  listSummaryFooter.classList.toggle('show', shouldShow);
-  if (shouldShow) {
+  const buttonShouldShow = items.length > 6 && listExpanded && !articuloSectionVisible && currentScrollY > scrollThreshold;
+  // The camera indicator + totals pill appear as soon as the list is expanded;
+  // only the "Ocultar lista total" button keeps the stricter scroll-based conditions.
+  listSummaryFooter.classList.toggle('show', listExpanded);
+  footerToggleListBtn.style.display = buttonShouldShow ? '' : 'none';
+  if (listExpanded) {
     footerCountTag.textContent = countTag.textContent;
     footerTotalQty.textContent = 'Cantidad total: ' + totalQtyEl.textContent;
     syncFooterCameraIndicator();
@@ -1615,6 +1622,7 @@ function updatePageScrollLock() {
   document.body.classList.toggle('list-scroll-active', listExpanded);
   footerBackdrop.classList.toggle('footer-elevated', listExpanded);
   bottomBarcodeRule.classList.toggle('footer-elevated', listExpanded);
+  footerDatetimeEl.classList.toggle('footer-elevated', listExpanded);
   footerDatetimeEl.classList.toggle('hidden-for-list', listExpanded);
 }
 updatePageScrollLock();
@@ -1649,6 +1657,7 @@ function renderItems() {
     itemsList.style.display = 'none';
     emptyMsg.style.display = 'block';
     toggleListBtn.style.display = 'none';
+    fitTextToOneLine(emptyMsg, 13, 8);
   } else {
     itemsList.style.display = 'block';
     emptyMsg.style.display = 'none';
@@ -1690,6 +1699,26 @@ function fitLatestCodeText() {
     el.style.fontSize = size + 'px';
   }
 }
+
+// Shrinks a single line of text (never wraps) down to a minimum size, only as
+// much as needed to fit its container — short text on wide screens stays at
+// its normal size.
+function fitTextToOneLine(el, maxSize, minSize) {
+  if (!el) return;
+  el.style.fontSize = maxSize + 'px';
+  let size = maxSize;
+  while (el.scrollWidth > el.clientWidth && size > minSize) {
+    size -= 1;
+    el.style.fontSize = size + 'px';
+  }
+}
+function fitResponsiveHeaderTexts() {
+  fitTextToOneLine(document.querySelector('.sub'), 13, 8);
+  fitTextToOneLine(document.getElementById('empty-msg'), 13, 8);
+}
+window.addEventListener('load', fitResponsiveHeaderTexts);
+window.addEventListener('resize', fitResponsiveHeaderTexts);
+fitResponsiveHeaderTexts();
 
 toggleListBtn.addEventListener('click', () => {
   listExpanded = !listExpanded;
