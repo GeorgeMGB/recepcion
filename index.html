@@ -726,6 +726,77 @@
   @media (display-mode: standalone), (display-mode: fullscreen), (display-mode: minimal-ui) {
     header{ padding-top: 44px; } /* 22px + 100% */
   }
+  .unknown-code-modal-overlay{
+    display:none;
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,0.78);
+    backdrop-filter:blur(3px);
+    z-index:100;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+    box-sizing:border-box;
+  }
+  .unknown-code-modal-overlay.show{display:flex;}
+  .unknown-code-modal{
+    width:100%;
+    max-width:360px;
+    background:var(--panel);
+    border:2px solid var(--accent);
+    border-radius:16px;
+    padding:22px 20px;
+    box-shadow:0 0 0 6px rgba(255,68,56,0.12), 0 12px 32px rgba(0,0,0,0.6);
+    text-align:center;
+  }
+  .unknown-code-modal-label{
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:700;
+    font-size:17px;
+    color:var(--accent);
+    letter-spacing:.02em;
+    margin-bottom:14px;
+  }
+  .unknown-code-modal-code{
+    font-family:'JetBrains Mono',monospace;
+    font-weight:700;
+    font-size:clamp(20px, 7vw, 28px);
+    color:#fff;
+    background:#000;
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:12px 10px;
+    margin-bottom:14px;
+    word-break:break-all;
+  }
+  .unknown-code-modal-msg{
+    font-size:14px;
+    line-height:1.5;
+    color:var(--text-dim);
+    margin-bottom:20px;
+  }
+  .unknown-code-modal-actions{
+    display:flex;
+    gap:10px;
+  }
+  .unknown-code-btn{
+    flex:1;
+    height:46px;
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:700;
+    font-size:15px;
+    border-radius:10px;
+    border:none;
+    cursor:pointer;
+  }
+  .unknown-code-btn-continue{
+    background:var(--success);
+    color:#0B1310;
+  }
+  .unknown-code-btn-delete{
+    background:var(--accent);
+    color:#fff;
+  }
 </style>
 </head>
 <body>
@@ -860,6 +931,18 @@
     <div class="list-summary-footer-totals">
       <span id="footer-count-tag">0 artículos</span>
       <span id="footer-total-qty">Cantidad total: 0</span>
+    </div>
+  </div>
+</div>
+
+<div class="unknown-code-modal-overlay" id="unknown-code-modal-overlay">
+  <div class="unknown-code-modal">
+    <div class="unknown-code-modal-label">⚠ Código desconocido</div>
+    <div class="unknown-code-modal-code" id="unknown-code-modal-code"></div>
+    <div class="unknown-code-modal-msg">Este código no coincide con ningún registro de la base de datos cargada.</div>
+    <div class="unknown-code-modal-actions">
+      <button class="unknown-code-btn unknown-code-btn-continue" id="unknown-code-continue-btn" type="button">Continuar</button>
+      <button class="unknown-code-btn unknown-code-btn-delete" id="unknown-code-delete-btn" type="button">Eliminar</button>
     </div>
   </div>
 </div>
@@ -1457,7 +1540,7 @@ function onScanSuccess(decodedText) {
 
   pendingCode = decodedText;
   codeInput.value = decodedText;
-  applyLookup(decodedText);
+  const found = applyLookup(decodedText);
   updateCodeReadout(decodedText);
   applyAutoQuantity(decodedText);
   playBeep();
@@ -1466,6 +1549,7 @@ function onScanSuccess(decodedText) {
   qtyInput.focus();
   if (navigator.vibrate) navigator.vibrate(60);
   updateScanLockUI();
+  if (!found) showUnknownCodeModal();
 }
 
 scanBtn.addEventListener('click', () => {
@@ -1485,15 +1569,18 @@ function applyLookup(code) {
     descInput.placeholder = 'Descripción del artículo';
     pendingSku = entry.sku ? entry.sku.trim() : '';
     pendingProductId = entry.productId ? entry.productId.trim() : '';
+    return true;
   } else if (hasDb && code) {
     descInput.value = 'Producto desconocido';
     pendingSku = '';
     pendingProductId = '';
+    return false;
   } else {
     descInput.value = '';
     descInput.placeholder = 'Descripción del artículo';
     pendingSku = '';
     pendingProductId = '';
+    return true; // no database loaded, or field empty: nothing to flag as unknown
   }
 }
 
@@ -1503,6 +1590,13 @@ codeInput.addEventListener('input', () => {
   updateCodeReadout(pendingCode);
   applyAutoQuantity(pendingCode);
   updateScanLockUI();
+});
+
+codeInput.addEventListener('blur', () => {
+  const code = codeInput.value.trim();
+  if (!code) return;
+  const found = applyLookup(code);
+  if (!found) showUnknownCodeModal();
 });
 
 // ---------- Add item ----------
@@ -1578,6 +1672,19 @@ function commitItem(code, desc, qty, sku, productId) {
   }
 }
 
+function resetCaptureFields() {
+  codeInput.value = '';
+  descInput.value = '';
+  descInput.placeholder = 'Descripción del artículo';
+  applyAutoQuantity('');
+  updateCodeReadout('');
+  pendingCode = '';
+  pendingSku = '';
+  pendingProductId = '';
+  updateScanLockUI(); // code field is empty again: scanning unlocks
+  if (!scanning) codeInput.focus();
+}
+
 // Adding a record is only ever done by pressing "Agregar" — there is no
 // automatic/implicit save path anywhere else in the app.
 addBtn.addEventListener('click', () => {
@@ -1589,20 +1696,43 @@ addBtn.addEventListener('click', () => {
   if (!code) { flash(codeInput); return; }
 
   commitItem(code, desc, finalQty, pendingSku, pendingProductId);
-
-  codeInput.value = '';
-  descInput.value = '';
-  descInput.placeholder = 'Descripción del artículo';
-  applyAutoQuantity('');
-  updateCodeReadout('');
-  pendingCode = '';
-  pendingSku = '';
-  pendingProductId = '';
-
-  updateScanLockUI(); // code field is empty again: scanning unlocks
-  if (!scanning) codeInput.focus();
-
+  resetCaptureFields();
   renderItems();
+});
+
+// ---------- Unknown-code confirmation modal ----------
+const unknownCodeOverlay = document.getElementById('unknown-code-modal-overlay');
+const unknownCodeCodeEl = document.getElementById('unknown-code-modal-code');
+const unknownCodeContinueBtn = document.getElementById('unknown-code-continue-btn');
+const unknownCodeDeleteBtn = document.getElementById('unknown-code-delete-btn');
+
+function showUnknownCodeModal() {
+  unknownCodeCodeEl.textContent = codeInput.value.trim();
+  unknownCodeOverlay.classList.add('show');
+  // Halts scanning and registration entirely until a decision is made below.
+  addBtn.disabled = true;
+  codeInput.readOnly = true;
+}
+function hideUnknownCodeModal() {
+  unknownCodeOverlay.classList.remove('show');
+  addBtn.disabled = false;
+  codeInput.readOnly = false;
+}
+
+unknownCodeContinueBtn.addEventListener('click', () => {
+  const code = codeInput.value.trim();
+  const desc = descInput.value.trim();
+  const qty = parseFloat(qtyInput.value);
+  const finalQty = (isNaN(qty) || qty <= 0) ? 1 : qty;
+  hideUnknownCodeModal();
+  commitItem(code, desc, finalQty, pendingSku, pendingProductId);
+  resetCaptureFields();
+  renderItems();
+});
+
+unknownCodeDeleteBtn.addEventListener('click', () => {
+  hideUnknownCodeModal();
+  resetCaptureFields();
 });
 
 function flash(el){
