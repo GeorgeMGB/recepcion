@@ -456,6 +456,7 @@
   }
   #reader-wrap.active{display:block;}
   #reader-wrap.scan-locked{opacity:.4;}
+  #reader-wrap.camera-hidden-for-modal{visibility:hidden;}
   #reader{width:100%;height:100%;}
   #reader video{
     width:100% !important;
@@ -732,7 +733,7 @@
     inset:0;
     background:rgba(0,0,0,0.78);
     backdrop-filter:blur(3px);
-    z-index:100;
+    z-index:9999;
     align-items:center;
     justify-content:center;
     padding:20px;
@@ -1712,11 +1713,17 @@ function showUnknownCodeModal() {
   // Halts scanning and registration entirely until a decision is made below.
   addBtn.disabled = true;
   codeInput.readOnly = true;
+  // Mobile browsers (notably iOS Safari) can promote a live <video> element to its
+  // own hardware compositing layer, which sometimes ignores normal z-index stacking
+  // and renders on top of everything else — including this modal. Hiding the camera
+  // preview outright while the modal is open sidesteps that regardless of browser.
+  readerWrap.classList.add('camera-hidden-for-modal');
 }
 function hideUnknownCodeModal() {
   unknownCodeOverlay.classList.remove('show');
   addBtn.disabled = false;
   codeInput.readOnly = false;
+  readerWrap.classList.remove('camera-hidden-for-modal');
 }
 
 unknownCodeContinueBtn.addEventListener('click', () => {
