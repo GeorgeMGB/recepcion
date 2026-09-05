@@ -1662,12 +1662,18 @@ footerToggleListBtn.addEventListener('click', () => {
 
 function commitItem(code, desc, qty, sku, productId) {
   if (!code || isNaN(qty) || qty <= 0) return;
-  const existing = items.find(it => it.code === code);
-  if (existing) {
+  const existingIdx = items.findIndex(it => it.code === code);
+  if (existingIdx !== -1) {
+    const existing = items[existingIdx];
     existing.qty += qty;
     if (desc) existing.description = desc;
     if (sku) existing.sku = sku;
     if (productId) existing.productId = productId;
+    // Move the updated item to the end so it becomes the newest/top-of-list
+    // entry — this way the accumulated quantity is immediately visible at a
+    // glance, without needing to scroll to find where it originally was.
+    items.splice(existingIdx, 1);
+    items.push(existing);
   } else {
     items.push({ code, description: desc, sku: sku || '', productId: productId || '', qty });
   }
